@@ -1,7 +1,16 @@
+# Build output
 bin/
 obj/
 publish/
+TestResults/
+x64/
+x86/
+ARM64/
+
+# IDE state
 .vs/
 *.user
 *.rsuser
 *.suo
+*.userosscache
+*.sln.docstates

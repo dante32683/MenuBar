@@ -159,5 +159,19 @@ namespace MenuBar.ViewModels
             get => _clockVisibility;
             set => SetProperty(ref _clockVisibility, value);
         }
+
+        private double _iconFontSize = 14;
+        public double IconFontSize
+        {
+            get => _iconFontSize;
+            set => SetProperty(ref _iconFontSize, value);
+        }
+
+        private double _textFontSize = 11;
+        public double TextFontSize
+        {
+            get => _textFontSize;
+            set => SetProperty(ref _textFontSize, value);
+        }
     }
 }

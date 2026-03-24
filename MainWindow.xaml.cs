@@ -157,7 +157,7 @@ namespace MenuBar
             NativeMethods.SHAppBarMessage(NativeMethods.ABM_SETPOS, ref abd);
 
             BackgroundBorder.Height = barHeight;
-            MainContentGrid.Height = Math.Max(24, barHeight - 4);
+            MainContentGrid.Height = barHeight;
             NativeMethods.SetWindowPos(
                 _hwnd,
                 (IntPtr)NativeMethods.HWND_TOPMOST,
@@ -234,6 +234,11 @@ namespace MenuBar
             ViewModel.BatteryVisibility = ToVisibility(_settings.ShowBattery);
             ViewModel.ClockVisibility = ToVisibility(_settings.ShowClock);
             ViewModel.LogoTooltip = "Power and system menu";
+
+            int barHeight = _settings.GetEffectiveBarHeight();
+            ViewModel.IconFontSize = barHeight * 0.62;
+            ViewModel.TextFontSize = barHeight * 0.44;
+
             ApplyMediaState();
         }
 

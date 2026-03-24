@@ -19,7 +19,7 @@
         </Grid.ContextFlyout>
 
         <Border x:Name="BackgroundBorder" Background="#B01C222A">
-            <Grid x:Name="MainContentGrid" Padding="8,0,6,0" Margin="0,-1,0,1" VerticalAlignment="Center">
+            <Grid x:Name="MainContentGrid" Padding="12,0" VerticalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -27,13 +27,13 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0" VerticalAlignment="Stretch">
                     <Border x:Name="LogoHost"
                             Visibility="{x:Bind ViewModel.LogoVisibility, Mode=OneWay}"
                             Background="Transparent"
                             CornerRadius="6"
-                            MinHeight="24"
-                            Padding="10,0"
+                            Padding="8,0"
+                            VerticalAlignment="Stretch"
                             PointerEntered="Host_PointerEntered"
                             PointerExited="Host_PointerExited"
                             PointerPressed="Host_PointerPressed"
@@ -52,7 +52,9 @@
                                 <MenuFlyoutItem Text="Shut down" Click="ShutdownSystem_Click" />
                             </MenuFlyout>
                         </FlyoutBase.AttachedFlyout>
-                        <Grid Width="14" Height="14">
+                        <Grid Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}" 
+                              Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}" 
+                              VerticalAlignment="Center">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="*" />
@@ -70,10 +72,8 @@
 
                     <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitle, Mode=OneWay}"
                                Visibility="{x:Bind ViewModel.TitleVisibility, Mode=OneWay}"
-                               Foreground="#B0FFFFFF"
-                               FontSize="11"
-                               LineHeight="14"
-                               LineStackingStrategy="BlockLineHeight"
+                               Foreground="White"
+                               FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                MaxWidth="340"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
@@ -84,13 +84,13 @@
                     </TextBlock>
                 </StackPanel>
 
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Stretch">
                     <Border x:Name="MediaHost"
                             Visibility="{x:Bind ViewModel.MediaVisibility, Mode=OneWay}"
                             Background="Transparent"
                             CornerRadius="6"
-                            MinHeight="24"
-                            Padding="10,0"
+                            Padding="8,0"
+                            VerticalAlignment="Stretch"
                             PointerEntered="Host_PointerEntered"
                             PointerExited="Host_PointerExited"
                             PointerPressed="Host_PointerPressed"
@@ -112,12 +112,10 @@
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
                             <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}"
-                                       FontSize="11"
-                                       LineHeight="14"
-                                       LineStackingStrategy="BlockLineHeight"
+                                       FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                        MaxWidth="310"
                                        TextTrimming="CharacterEllipsis"
-                                       Foreground="#B0FFFFFF"
+                                       Foreground="White"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
@@ -126,8 +124,8 @@
                             Visibility="{x:Bind ViewModel.NetworkVisibility, Mode=OneWay}"
                             Background="Transparent"
                             CornerRadius="6"
-                            MinHeight="24"
-                            Padding="6,0"
+                            Padding="8,0"
+                            VerticalAlignment="Stretch"
                             PointerEntered="Host_PointerEntered"
                             PointerExited="Host_PointerExited"
                             PointerPressed="Host_PointerPressed"
@@ -145,7 +143,11 @@
                             </MenuFlyout>
                         </FlyoutBase.AttachedFlyout>
                         <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Text="{x:Bind ViewModel.NetworkIcon, Mode=OneWay}" FontFamily="Segoe Fluent Icons" FontSize="14" LineHeight="14" LineStackingStrategy="BlockLineHeight" Foreground="White" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind ViewModel.NetworkIcon, Mode=OneWay}" 
+                                       FontFamily="Segoe Fluent Icons" 
+                                       FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}" 
+                                       Foreground="White" 
+                                       VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
 
@@ -153,8 +155,8 @@
                             Visibility="{x:Bind ViewModel.BatteryVisibility, Mode=OneWay}"
                             Background="Transparent"
                             CornerRadius="6"
-                            MinHeight="24"
-                            Padding="6,0"
+                            Padding="8,0"
+                            VerticalAlignment="Stretch"
                             PointerEntered="Host_PointerEntered"
                             PointerExited="Host_PointerExited"
                             PointerPressed="Host_PointerPressed"
@@ -171,37 +173,35 @@
                             </MenuFlyout>
                         </FlyoutBase.AttachedFlyout>
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <Grid Width="20" Height="18" VerticalAlignment="Center">
+                            <Grid Width="22" VerticalAlignment="Center">
                                 <TextBlock x:Name="BatteryFillGlyphText"
                                            Text="{x:Bind ViewModel.BatteryIcon, Mode=OneWay}"
                                            FontFamily="Segoe Fluent Icons"
-                                           FontSize="18"
-                                           LineHeight="18"
-                                           LineStackingStrategy="BlockLineHeight"
+                                           FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
                                            Foreground="White"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Center" />
                                 <TextBlock x:Name="BatteryOutlineGlyphText"
                                            Text="&#xEBA0;"
                                            FontFamily="Segoe Fluent Icons"
-                                           FontSize="18"
-                                           LineHeight="18"
-                                           LineStackingStrategy="BlockLineHeight"
+                                           FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
                                            Foreground="White"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Center" />
                                 <Path x:Name="BatteryBoltPath"
                                       Visibility="Collapsed"
                                       HorizontalAlignment="Center"
-                                      VerticalAlignment="Top"
+                                      VerticalAlignment="Center"
                                       Fill="White"
                                       Data="M 8,0 L 4.8,4.8 H 7.1 L 5.8,10 L 10,4.4 H 7.7 Z"
                                       Stretch="Uniform"
                                       Width="6.4"
-                                      Height="8.53"
-                                      Margin="0,-2,0,0" />
+                                      Height="8.53" />
                             </Grid>
-                            <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}" FontSize="11" LineHeight="14" LineStackingStrategy="BlockLineHeight" Foreground="White" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}" 
+                                       FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}" 
+                                       Foreground="White" 
+                                       VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
 
@@ -209,8 +209,8 @@
                             Visibility="{x:Bind ViewModel.ClockVisibility, Mode=OneWay}"
                             Background="Transparent"
                             CornerRadius="6"
-                            MinHeight="24"
-                            Padding="10,0"
+                            Padding="8,0"
+                            VerticalAlignment="Stretch"
                             PointerEntered="Host_PointerEntered"
                             PointerExited="Host_PointerExited"
                             PointerPressed="Host_PointerPressed"
@@ -220,9 +220,7 @@
                             <ToolTip Content="{x:Bind ViewModel.ClockTooltip, Mode=OneWay}" />
                         </ToolTipService.ToolTip>
                         <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}"
-                                   FontSize="11"
-                                   LineHeight="14"
-                                   LineStackingStrategy="BlockLineHeight"
+                                   FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                    Foreground="White"
                                    VerticalAlignment="Center" />
                     </Border>
