@@ -12,7 +12,6 @@ import json
 import asyncio
 import ctypes
 import ctypes.wintypes
-import socket
 import subprocess
 import traceback
 import logging
@@ -35,7 +34,7 @@ from PyQt6.QtWidgets import (
     QLabel, QFrame, QSizePolicy,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, QRect, QRectF
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QFontDatabase
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QFontDatabase, QLinearGradient
 
 # ── Media (optional — graceful fallback) ──────────────────────
 try:
@@ -98,11 +97,17 @@ DWMSBT_MAINWINDOW             = 2
 DWMWA_MICA_EFFECT             = 1029
 WCA_ACCENT_POLICY             = 19
 ACCENT_ENABLE_ACRYLIC         = 4
-HWND_TOPMOST, SWP_NOACTIVATE, SWP_SHOWWINDOW = -1, 0x0010, 0x0040
+HWND_TOPMOST = -1
+SWP_NOSIZE, SWP_NOMOVE, SWP_NOZORDER = 0x0001, 0x0002, 0x0004
+SWP_NOACTIVATE, SWP_SHOWWINDOW = 0x0010, 0x0040
+SWP_FRAMECHANGED, SWP_NOOWNERZORDER = 0x0020, 0x0200
 VK_LWIN, VK_N, KEYEVENTF_KEYUP = 0x5B, 0x4E, 0x0002
 VK_MEDIA_PLAY_PAUSE = 0xB3
 VK_MEDIA_NEXT_TRACK = 0xB0
 VK_MEDIA_PREV_TRACK = 0xB1
+GWL_EXSTYLE = -20
+WS_EX_TOOLWINDOW = 0x00000080
+WS_EX_APPWINDOW = 0x00040000
 
 # Power broadcast
 WM_POWERBROADCAST      = 0x0218
@@ -127,16 +132,14 @@ class WCAD(ctypes.Structure):
 # ─────────────────────────────────────────────────────────────
 #  AppBar registration
 # ─────────────────────────────────────────────────────────────
-def register_appbar(hwnd, height):
-    u = windll.user32
-    l = u.GetSystemMetrics(SM_XVIRTUALSCREEN)
-    t = u.GetSystemMetrics(SM_YVIRTUALSCREEN)
-    w = u.GetSystemMetrics(SM_CXVIRTUALSCREEN)
+def register_appbar(hwnd, height, register=True):
+    l, t, w = _virtual_screen_metrics()
     abd = APPBARDATA()
     abd.cbSize = ctypes.sizeof(APPBARDATA)
     abd.hWnd = hwnd; abd.uCallbackMessage = 0x0401; abd.uEdge = ABE_TOP
     abd.rc.left, abd.rc.top, abd.rc.right, abd.rc.bottom = l, t, l + w, t + height
-    windll.shell32.SHAppBarMessage(ABM_NEW, ctypes.byref(abd))
+    if register:
+        windll.shell32.SHAppBarMessage(ABM_NEW, ctypes.byref(abd))
     windll.shell32.SHAppBarMessage(ABM_QUERYPOS, ctypes.byref(abd))
     abd.rc.bottom = abd.rc.top + height
     windll.shell32.SHAppBarMessage(ABM_SETPOS, ctypes.byref(abd))
@@ -146,6 +149,23 @@ def unregister_appbar(hwnd):
     abd = APPBARDATA()
     abd.cbSize = ctypes.sizeof(APPBARDATA); abd.hWnd = hwnd
     windll.shell32.SHAppBarMessage(ABM_REMOVE, ctypes.byref(abd))
+
+def _hide_window_from_alt_tab(hwnd):
+    try:
+        user32 = windll.user32
+        get_long = getattr(user32, "GetWindowLongPtrW", user32.GetWindowLongW)
+        set_long = getattr(user32, "SetWindowLongPtrW", user32.SetWindowLongW)
+        exstyle = get_long(hwnd, GWL_EXSTYLE)
+        exstyle = (exstyle | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
+        set_long(hwnd, GWL_EXSTYLE, exstyle)
+        user32.SetWindowPos(
+            hwnd, 0, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+            SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE,
+        )
+        log.info("[Window] Alt-Tab hidden")
+    except Exception as e:
+        log.warning("[Window] Failed to hide from Alt-Tab: %s", e)
 
 # ─────────────────────────────────────────────────────────────
 #  Backdrop (Mica -> acrylic cascade)
@@ -179,6 +199,8 @@ def apply_backdrop(hwnd):
 #  Windows accent color
 # ─────────────────────────────────────────────────────────────
 _accent_color = None  # set in main()
+_BAR_INSTANCE = None
+ENABLE_NATIVE_INTEGRATION = True
 
 def _read_accent_color() -> QColor | None:
     try:
@@ -195,6 +217,18 @@ def _read_accent_color() -> QColor | None:
     except Exception as e:
         log.warning("[Accent] %s", e)
         return None
+
+def _read_personalize_dword(name: str, default: int = 0) -> int:
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        )
+        val, _ = winreg.QueryValueEx(key, name)
+        winreg.CloseKey(key)
+        return int(val)
+    except Exception:
+        return default
 
 # ─────────────────────────────────────────────────────────────
 #  System info
@@ -240,11 +274,17 @@ def _parse_netsh():
 def get_network_info():
     connected = False
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1)
-            s.connect(("8.8.8.8", 53))
+        for name, stats in psutil.net_if_stats().items():
+            lname = name.lower()
+            if not stats.isup:
+                continue
+            if lname.startswith("loopback") or "loopback" in lname:
+                continue
+            if "virtual" in lname or "vethernet" in lname:
+                continue
             connected = True
-    except OSError:
+            break
+    except Exception:
         pass
 
     nd = _parse_netsh()
@@ -341,6 +381,61 @@ def _sample_bar_bg(phys_y: int) -> QColor:
         return QColor(20, 20, 20)
     return QColor(rs // n, gs // n, bs // n)
 
+def _sample_taskbar_color() -> QColor | None:
+    try:
+        user32 = windll.user32
+        hwnd = user32.FindWindowW("Shell_TrayWnd", None)
+        if not hwnd:
+            return None
+
+        rect = wintypes.RECT()
+        if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+            return None
+
+        left, top, right, bottom = rect.left, rect.top, rect.right, rect.bottom
+        width = max(0, right - left)
+        height = max(0, bottom - top)
+        if width < 20 or height < 20:
+            return None
+
+        gdi = windll.gdi32
+        hdc = user32.GetDC(0)
+        try:
+            rs = gs = bs = n = 0
+            if width >= height:
+                y_offsets = [max(3, height // 8), max(6, height // 5)]
+                x_fracs = (0.08, 0.18, 0.28, 0.72, 0.82)
+                points = [
+                    (left + int(width * frac), top + yoff)
+                    for yoff in y_offsets for frac in x_fracs
+                ]
+            else:
+                x_offsets = [max(3, width // 8), max(6, width // 5)]
+                y_fracs = (0.08, 0.18, 0.28, 0.72, 0.82)
+                points = [
+                    (left + xoff, top + int(height * frac))
+                    for xoff in x_offsets for frac in y_fracs
+                ]
+
+            for x, y in points:
+                c = gdi.GetPixel(hdc, x, y)
+                if 0 <= c <= 0x00FFFFFF:
+                    rs += c & 0xFF
+                    gs += (c >> 8) & 0xFF
+                    bs += (c >> 16) & 0xFF
+                    n += 1
+        finally:
+            user32.ReleaseDC(0, hdc)
+
+        if n == 0:
+            return None
+        sampled = QColor(rs // n, gs // n, bs // n)
+        log.info("[Taskbar] sampled #%02x%02x%02x", sampled.red(), sampled.green(), sampled.blue())
+        return sampled
+    except Exception as e:
+        log.warning("[Taskbar] sample failed: %s", e)
+        return None
+
 
 def _color_dist(a: QColor, b: QColor) -> int:
     return abs(a.red()-b.red()) + abs(a.green()-b.green()) + abs(a.blue()-b.blue())
@@ -362,23 +457,94 @@ ICON_POWER     = "\uE7E8"
 # ─────────────────────────────────────────────────────────────
 #  WinUI 3 design tokens & constants
 # ─────────────────────────────────────────────────────────────
-BAR_HEIGHT = SETTINGS["bar_height"]
-EXTRA_PAD  = 8
+EXTRA_PAD  = 10
 ICON_PT    = 11
 TEXT_PT    = 10
 
-TEXT_COL     = "#FFFFFF"
-TEXT_SEC_COL = "rgba(255,255,255,139)"
-TEXT_DIM_COL = "rgba(255,255,255,87)"
+TEXT_COL        = "#FFFFFF"
+TEXT_SEC_COL    = "rgba(255,255,255,139)"
+TEXT_DIM_COL    = "rgba(255,255,255,87)"
+TEXT_FAINT_COL  = "rgba(255,255,255,64)"
 
-HOVER_BG = QColor(255, 255, 255, 15)
-PRESS_BG = QColor(255, 255, 255, 10)
-
-POPUP_BG     = QColor(44, 44, 44, 252)
-POPUP_BORDER = QColor(255, 255, 255, 21)
-POPUP_RADIUS = 8
+HOVER_BG        = QColor(255, 255, 255, 15)
+PRESS_BG        = QColor(255, 255, 255, 10)
+POPUP_BG        = QColor(44, 44, 44, 252)
+POPUP_BORDER    = QColor(255, 255, 255, 21)
+POPUP_RADIUS    = 10
+BAR_EDGE        = QColor(255, 255, 255, 24)
+BAR_HIGHLIGHT   = QColor(255, 255, 255, 14)
+BAR_ACCENT_GLOW = QColor(118, 185, 255, 60)
+_DEFAULT_BAR_COLOR = QColor(28, 34, 42, 240)
 
 _TEXT_FONT_FAMILY = "Segoe UI Variable"
+
+def _bar_height() -> int:
+    try:
+        return max(24, min(56, int(SETTINGS.get("bar_height", 28))))
+    except Exception:
+        return 28
+
+BAR_HEIGHT = _bar_height()
+
+def _rgba(color: QColor) -> str:
+    return f"rgba({color.red()},{color.green()},{color.blue()},{color.alpha()})"
+
+def _mix(c1: QColor, c2: QColor, amount: float) -> QColor:
+    amt = max(0.0, min(1.0, amount))
+    inv = 1.0 - amt
+    return QColor(
+        int(c1.red() * inv + c2.red() * amt),
+        int(c1.green() * inv + c2.green() * amt),
+        int(c1.blue() * inv + c2.blue() * amt),
+        int(c1.alpha() * inv + c2.alpha() * amt),
+    )
+
+def _accent_brush() -> QColor:
+    if SETTINGS.get("use_accent_color") and _accent_color:
+        return QColor(_accent_color.red(), _accent_color.green(), _accent_color.blue(), 88)
+    return QColor(118, 185, 255, 60)
+
+def _refresh_design_tokens():
+    global BAR_HEIGHT, TEXT_COL, TEXT_SEC_COL, TEXT_DIM_COL, TEXT_FAINT_COL
+    global HOVER_BG, PRESS_BG, POPUP_BG, POPUP_BORDER, POPUP_RADIUS
+    global BAR_EDGE, BAR_HIGHLIGHT, BAR_ACCENT_GLOW, _DEFAULT_BAR_COLOR
+
+    BAR_HEIGHT = _bar_height()
+    apps_light = bool(_read_personalize_dword("AppsUseLightTheme", 0))
+    neutral_surface = QColor(244, 246, 249, 244) if apps_light else QColor(35, 39, 46, 244)
+    neutral_popup = QColor(252, 253, 255, 248) if apps_light else QColor(40, 44, 52, 248)
+
+    BAR_ACCENT_GLOW = _accent_brush()
+    sampled_taskbar = _sample_taskbar_color()
+
+    if sampled_taskbar:
+        base_surface = _mix(neutral_surface, sampled_taskbar, 0.78)
+    elif SETTINGS.get("use_accent_color") and _accent_color:
+        accent_surface = QColor(_accent_color.red(), _accent_color.green(), _accent_color.blue(), 244)
+        base_surface = _mix(neutral_surface, accent_surface, 0.16)
+    else:
+        base_surface = neutral_surface
+
+    if SETTINGS.get("use_accent_color") and _accent_color:
+        accent_surface = QColor(_accent_color.red(), _accent_color.green(), _accent_color.blue(), 248)
+        popup_surface = _mix(neutral_popup, accent_surface, 0.1)
+    else:
+        popup_surface = neutral_popup
+
+    _DEFAULT_BAR_COLOR = base_surface
+    BAR_EDGE = QColor(255, 255, 255, 18) if apps_light else QColor(255, 255, 255, 12)
+    BAR_HIGHLIGHT = QColor(255, 255, 255, 0)
+    HOVER_BG = QColor(0, 0, 0, 14) if apps_light else QColor(255, 255, 255, 18)
+    PRESS_BG = QColor(0, 0, 0, 8) if apps_light else QColor(255, 255, 255, 10)
+    POPUP_BG = popup_surface
+    POPUP_BORDER = QColor(0, 0, 0, 18) if apps_light else QColor(255, 255, 255, 28)
+    POPUP_RADIUS = 12
+    TEXT_COL = "#1A1C20" if apps_light else "#F5F7FA"
+    TEXT_SEC_COL = "rgba(26,28,32,170)" if apps_light else "rgba(245,247,250,170)"
+    TEXT_DIM_COL = "rgba(26,28,32,118)" if apps_light else "rgba(245,247,250,118)"
+    TEXT_FAINT_COL = "rgba(26,28,32,72)" if apps_light else "rgba(245,247,250,72)"
+
+_refresh_design_tokens()
 
 def _ifont(pt=ICON_PT) -> QFont:
     return QFont(_ICON_FONT, pt)
@@ -401,6 +567,32 @@ def _all_screens_rect() -> QRect:
     for s in QApplication.screens():
         r = r.united(s.geometry())
     return r if not r.isNull() else QApplication.primaryScreen().geometry()
+
+def _virtual_screen_metrics():
+    u = windll.user32
+    return (
+        u.GetSystemMetrics(SM_XVIRTUALSCREEN),
+        u.GetSystemMetrics(SM_YVIRTUALSCREEN),
+        u.GetSystemMetrics(SM_CXVIRTUALSCREEN),
+    )
+
+def _place_popup_below(anchor: QWidget, popup: QWidget, right_align=True, gap=8):
+    popup.adjustSize()
+    ar = anchor.rect()
+    bottom_right = anchor.mapToGlobal(QPoint(ar.right(), ar.bottom()))
+    bottom_left = anchor.mapToGlobal(QPoint(ar.left(), ar.bottom()))
+
+    if right_align:
+        x = bottom_right.x() - popup.width()
+    else:
+        x = bottom_left.x()
+    y = bottom_right.y() + gap
+
+    bounds = _all_screens_rect()
+    x = max(bounds.left() + 8, min(x, bounds.right() - popup.width() - 8))
+    y = max(bounds.top() + 8, min(y, bounds.bottom() - popup.height() - 8))
+    popup.move(x, y)
+    popup.show()
 
 # ─────────────────────────────────────────────────────────────
 #  Windows logo — drawn with QPainter (no font glyph exists)
@@ -587,7 +779,7 @@ class InfoPopup(QWidget):
         f = QFrame(self)
         f.setFrameShape(QFrame.Shape.HLine)
         f.setFixedHeight(1)
-        f.setStyleSheet("background: rgba(255,255,255,8.2%);")
+        f.setStyleSheet(f"background: {_rgba(BAR_EDGE)};")
         self._vbox.addWidget(f)
         self._vbox.addSpacing(2)
 
@@ -605,10 +797,7 @@ class InfoPopup(QWidget):
         self._vbox.addWidget(row)
 
     def show_below(self, widget: QWidget):
-        self.adjustSize()
-        br = widget.mapToGlobal(QPoint(widget.width(), widget.height() + 6))
-        x  = max(0, br.x() - self.W)
-        self.move(x, br.y()); self.show()
+        _place_popup_below(widget, self)
 
     def paintEvent(self, _):
         p = QPainter(self)
@@ -617,6 +806,10 @@ class InfoPopup(QWidget):
         p.setPen(QPen(POPUP_BORDER, 1))
         p.setBrush(POPUP_BG)
         p.drawRoundedRect(r, POPUP_RADIUS, POPUP_RADIUS)
+        glow = QRectF(r).adjusted(1, 1, -1, -r.height() * 0.52)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(_mix(POPUP_BG, BAR_ACCENT_GLOW, 0.22))
+        p.drawRoundedRect(glow, POPUP_RADIUS, POPUP_RADIUS)
         p.end()
 
 
@@ -861,8 +1054,11 @@ class MenuExtra(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(PRESS_BG if self._prs else HOVER_BG)
-        p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 3, -1, -3), 4, 4)
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(2, 4, -2, -4), 6, 6)
         p.end()
+
+    def sync_metrics(self):
+        self.setFixedHeight(BAR_HEIGHT)
 
 # ─────────────────────────────────────────────────────────────
 #  Right-side extras
@@ -893,6 +1089,10 @@ class BatteryExtra(MenuExtra):
             self._txt.setText("AC")
         self.adjustSize()
 
+    def sync_metrics(self):
+        super().sync_metrics()
+        self.layout().setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
+
     def _on_click(self):
         if self._popup and self._popup.isVisible():
             self._popup.close(); return
@@ -919,6 +1119,10 @@ class NetworkExtra(MenuExtra):
         self._info = info
         self._icon.set_state(info["connected"], info["signal"] if info["is_wifi"] else 3)
         self.adjustSize()
+
+    def sync_metrics(self):
+        super().sync_metrics()
+        self.layout().setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
 
     def _on_click(self):
         if self._popup and self._popup.isVisible():
@@ -952,6 +1156,10 @@ class ClockExtra(MenuExtra):
 
     def _on_click(self):
         open_notification_center()
+
+    def sync_metrics(self):
+        super().sync_metrics()
+        self.layout().setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD + 2, 0)
 
 
 class MediaExtra(MenuExtra):
@@ -995,19 +1203,19 @@ class MediaExtra(MenuExtra):
         self._txt.setText(display)
 
         # Accent-colored dot when playing
-        if info.get("playing") and _accent_color:
-            r, g, b = _accent_color.red(), _accent_color.green(), _accent_color.blue()
+        if info.get("playing"):
             self._dot.setStyleSheet(
-                f"background: rgb({r},{g},{b}); border-radius: 3px;")
-        elif info.get("playing"):
-            self._dot.setStyleSheet(
-                "background: rgb(76,194,255); border-radius: 3px;")
+                "background: rgb(106,196,91); border-radius: 3px;")
         else:
             self._dot.setStyleSheet(
                 "background: rgba(255,255,255,60); border-radius: 3px;")
 
         self.show()
         self.adjustSize()
+
+    def sync_metrics(self):
+        super().sync_metrics()
+        self.layout().setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
 
     def _on_click(self):
         if self._popup and self._popup.isVisible():
@@ -1025,26 +1233,26 @@ class MediaExtra(MenuExtra):
 def _menu_ss():
     return f"""
 QMenu {{
-    background: rgba(44,44,44,252);
-    border: 1px solid rgba(255,255,255,8.2%);
+    background: {_rgba(POPUP_BG)};
+    border: 1px solid {_rgba(POPUP_BORDER)};
     border-radius: {POPUP_RADIUS}px;
-    padding: 4px 0;
+    padding: 6px 0;
     color: {TEXT_COL};
 }}
 QMenu::item {{
-    padding: 8px 36px 8px 12px;
-    border-radius: 4px;
-    margin: 2px 4px;
+    padding: 9px 36px 9px 12px;
+    border-radius: 6px;
+    margin: 2px 6px;
     font-family: "{_TEXT_FONT_FAMILY}";
     font-size: 12px;
 }}
 QMenu::item:selected {{
-    background: rgba(255,255,255,5.8%);
+    background: {_rgba(HOVER_BG)};
 }}
 QMenu::separator {{
     height: 1px;
-    background: rgba(255,255,255,8.2%);
-    margin: 4px 8px;
+    background: {_rgba(BAR_EDGE)};
+    margin: 6px 10px;
 }}
 """
 
@@ -1081,6 +1289,10 @@ class WinLogoExtra(MenuExtra):
         elif ch == rs: restart_system()
         elif ch == sd: shutdown_system()
 
+    def sync_metrics(self):
+        super().sync_metrics()
+        self.layout().setContentsMargins(12, 0, 12, 0)
+
 # ─────────────────────────────────────────────────────────────
 #  Active window title
 # ─────────────────────────────────────────────────────────────
@@ -1093,52 +1305,94 @@ class TitleLabel(QLabel):
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
-# ─────────────────────────────────────────────────────────────
-#  Main bar
-# ─────────────────────────────────────────────────────────────
-_DEFAULT_BAR_COLOR = QColor(0x20, 0x20, 0x20)
+    def sync_style(self):
+        self.setFont(_ufont(10))
+        self.setStyleSheet(f"color:{TEXT_SEC_COL}; background:transparent;")
 
 class MenuBar(QWidget):
     def __init__(self):
         super().__init__()
         self._mica     = False
         self._last_fg  = None
+        self._last_bg_hwnd = None
+        self._last_bg_sample_at = 0.0
         self._hwnd     = None
         self._phys_h   = BAR_HEIGHT
         self._bg_color = _DEFAULT_BAR_COLOR
+        self._timers   = []
+        self._root_lay = None
+        self._native_ready = False
+        self._appbar_registered = False
+        self.logo = self.title = self.media = self.net = self.batt = self.clock = None
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint
-                            | Qt.WindowType.WindowStaysOnTopHint
-                            | Qt.WindowType.Tool)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+                            | Qt.WindowType.WindowStaysOnTopHint)
         r = _all_screens_rect()
         self.setGeometry(r.left(), r.top(), r.width(), BAR_HEIGHT)
-        self._build_ui()
-        self._setup_timers()
+        self.setFixedHeight(BAR_HEIGHT)
         self.show()
-        self._hwnd = int(self.winId())
-        self._mica = apply_backdrop(self._hwnd)
-        self._pin()
-        self._poll_title()
-        self._poll_status()
+        QTimer.singleShot(0, self._finish_startup)
+
+    def _finish_startup(self):
+        try:
+            self._apply_settings(initial=True)
+            self._poll_title()
+            self._poll_status()
+            self._poll_media()
+        except Exception:
+            log.warning("[MenuBar] delayed startup failed:\n%s", traceback.format_exc())
+            return
+        if not ENABLE_NATIVE_INTEGRATION:
+            return
+        QTimer.singleShot(40, self._enable_native_features)
+
+    def _enable_native_features(self):
+        try:
+            self._hwnd = int(self.winId())
+            if not self._hwnd:
+                return
+            _hide_window_from_alt_tab(self._hwnd)
+            self._mica = apply_backdrop(self._hwnd)
+            self._pin()
+            self._native_ready = True
+            log.info("[MenuBar] Native integration ready")
+        except Exception:
+            self._hwnd = None
+            self._native_ready = False
+            log.warning("[MenuBar] native integration failed:\n%s", traceback.format_exc())
+
+    def _clear_layout(self):
+        lay = self.layout()
+        if not lay:
+            return None
+        while lay.count():
+            item = lay.takeAt(0)
+            if widget := item.widget():
+                widget.deleteLater()
+            del item
+        return lay
 
     def _build_ui(self):
+        lay = self._clear_layout()
         self.setStyleSheet("QWidget { background:transparent; }")
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 4, 0)
-        lay.setSpacing(0)
+        if lay is None:
+            lay = QHBoxLayout()
+            self.setLayout(lay)
+        lay.setContentsMargins(8, 0, 6, 0)
+        lay.setSpacing(2)
+        self._root_lay = lay
 
         self.logo  = WinLogoExtra(self) if SETTINGS.get("show_windows_logo", True) else None
-        self.title = TitleLabel(self) if SETTINGS["show_title"] else None
-        self.media = MediaExtra(self) if SETTINGS["show_media"] else None
-        self.net   = NetworkExtra(self) if SETTINGS["show_network"] else None
-        self.batt  = BatteryExtra(self) if SETTINGS["show_battery"] else None
-        self.clock = ClockExtra(self) if SETTINGS["show_clock"] else None
+        self.title = TitleLabel(self) if SETTINGS.get("show_title", True) else None
+        self.media = MediaExtra(self) if SETTINGS.get("show_media", True) else None
+        self.net   = NetworkExtra(self) if SETTINGS.get("show_network", True) else None
+        self.batt  = BatteryExtra(self) if SETTINGS.get("show_battery", True) else None
+        self.clock = ClockExtra(self) if SETTINGS.get("show_clock", True) else None
 
         if self.logo:
             lay.addWidget(self.logo)
-            lay.addSpacing(4)
+            lay.addSpacing(2)
         if self.title:
+            self.title.sync_style()
             lay.addWidget(self.title)
         lay.addStretch()
         if self.media:
@@ -1150,16 +1404,62 @@ class MenuBar(QWidget):
         if self.clock:
             lay.addWidget(self.clock)
 
+        for widget in (self.logo, self.media, self.net, self.batt, self.clock):
+            if widget and hasattr(widget, "sync_metrics"):
+                widget.sync_metrics()
+
+    def _clear_timers(self):
+        for timer in self._timers:
+            timer.stop()
+            timer.deleteLater()
+        self._timers.clear()
+
+    def _add_timer(self, interval_ms, slot):
+        timer = QTimer(self)
+        timer.timeout.connect(slot)
+        timer.start(interval_ms)
+        self._timers.append(timer)
+        return timer
+
     def _setup_timers(self):
-        t1 = QTimer(self); t1.timeout.connect(self._poll_title_safe);  t1.start(500)
+        self._clear_timers()
+        self._add_timer(500, self._poll_title_safe)
         if self.clock:
-            t2 = QTimer(self); t2.timeout.connect(self._tick_clock_safe); t2.start(10_000)
-        t3 = QTimer(self); t3.timeout.connect(self._poll_status_safe); t3.start(30_000)
+            self._add_timer(10_000, self._tick_clock_safe)
+        self._add_timer(15_000, self._poll_status_safe)
         if self.media and _HAS_MEDIA:
-            t4 = QTimer(self); t4.timeout.connect(self._poll_media_safe); t4.start(3_000)
+            self._add_timer(3_000, self._poll_media_safe)
             QTimer.singleShot(500, self._poll_media_safe)
-        # Watchdog — re-pins bar and checks health every 60 s
-        self._wdog = QTimer(self); self._wdog.timeout.connect(self._health_check); self._wdog.start(60_000)
+        self._wdog = self._add_timer(60_000, self._health_check)
+
+    def _apply_settings(self, initial=False):
+        global _accent_color
+        if SETTINGS.get("use_accent_color"):
+            _accent_color = _read_accent_color()
+        else:
+            _accent_color = None
+        _refresh_design_tokens()
+
+        r = _all_screens_rect()
+        self._phys_h = BAR_HEIGHT
+        self.setGeometry(r.left(), r.top(), r.width(), BAR_HEIGHT)
+        self.setFixedHeight(BAR_HEIGHT)
+        self._bg_color = _DEFAULT_BAR_COLOR
+        self._build_ui()
+        self._setup_timers()
+        self.update()
+
+        if not initial:
+            self._last_fg = None
+            self._last_bg_hwnd = None
+            self._last_bg_sample_at = 0.0
+            self._poll_title_safe()
+            self._poll_status_safe()
+            self._poll_media_safe()
+            if self._hwnd and windll.user32.IsWindow(self._hwnd):
+                _hide_window_from_alt_tab(self._hwnd)
+                self._mica = apply_backdrop(self._hwnd)
+                self._pin()
 
     # ── Guarded timer callbacks ───────────────────────────────
     def _poll_title_safe(self):
@@ -1178,28 +1478,12 @@ class MenuBar(QWidget):
         try: self._poll_media()
         except Exception: log.debug("[timer] poll_media:\n%s", traceback.format_exc())
 
-    # ── Power / sleep events ──────────────────────────────────
-    def nativeEvent(self, event_type, message):
-        try:
-            if event_type == b"windows_generic_MSG":
-                msg = ctypes.cast(int(message),
-                                  ctypes.POINTER(ctypes.wintypes.MSG)).contents
-                if msg.message == WM_POWERBROADCAST:
-                    wp = int(msg.wParam)
-                    if wp == PBT_APMSUSPEND:
-                        log.info("[Power] Suspending")
-                    elif wp in (PBT_APMRESUMEAUTOMATIC, PBT_APMRESUMESUSPEND):
-                        log.info("[Power] Resumed (wParam=0x%x)", wp)
-                        QTimer.singleShot(3000, self._on_resume)
-        except Exception as e:
-            log.debug("[nativeEvent] %s", e)
-        return super().nativeEvent(event_type, message)
-
     def _on_resume(self):
         """Re-anchor the bar after sleep/hibernate wake."""
         log.info("[Power] Applying post-resume fixes")
         try:
             if self._hwnd and windll.user32.IsWindow(self._hwnd):
+                _hide_window_from_alt_tab(self._hwnd)
                 self._mica = apply_backdrop(self._hwnd)
                 self._pin()
                 self.update()
@@ -1211,11 +1495,12 @@ class MenuBar(QWidget):
 
     # ── Screen-change handler ─────────────────────────────────
     def _on_screen_change(self):
-        log.info("[Screen] Change detected, re-pinning")
         try:
             r = _all_screens_rect()
             self.setGeometry(r.left(), r.top(), r.width(), BAR_HEIGHT)
+            self.setFixedHeight(BAR_HEIGHT)
             if self._hwnd and windll.user32.IsWindow(self._hwnd):
+                _hide_window_from_alt_tab(self._hwnd)
                 self._pin()
         except Exception:
             log.warning("[Screen] Re-pin failed:\n%s", traceback.format_exc())
@@ -1225,12 +1510,12 @@ class MenuBar(QWidget):
         """Periodic self-check: ensure bar is visible and pinned correctly."""
         try:
             if not self.isVisible():
-                log.warning("[Watchdog] Bar hidden — showing")
                 self.show()
-            if self._hwnd:
+            if self._hwnd and self._native_ready:
                 if not windll.user32.IsWindow(self._hwnd):
                     log.error("[Watchdog] HWND invalid — skipping re-pin")
                     return
+                _hide_window_from_alt_tab(self._hwnd)
                 self._pin()
         except Exception:
             log.warning("[Watchdog] Health check error:\n%s", traceback.format_exc())
@@ -1241,13 +1526,11 @@ class MenuBar(QWidget):
             buf = ctypes.create_unicode_buffer(256)
             windll.user32.GetClassNameW(fg or 0, buf, 256)
             cls = buf.value
-            if not fg or fg == self._hwnd or cls in _SHELL_CLASSES:
-                new_col = _DEFAULT_BAR_COLOR
-            else:
-                new_col = _sample_bar_bg(self._phys_h)
-            if _color_dist(new_col, self._bg_color) > 12:
-                self._bg_color = new_col
+
+            if _color_dist(_DEFAULT_BAR_COLOR, self._bg_color) > 6:
+                self._bg_color = _DEFAULT_BAR_COLOR
                 self.update()
+
             if fg == self._last_fg or fg == self._hwnd:
                 return
             self._last_fg = fg
@@ -1279,16 +1562,22 @@ class MenuBar(QWidget):
         u   = windll.user32
         dpr = self.devicePixelRatioF() or 1.0
         self._phys_h = math.ceil(BAR_HEIGHT * dpr)
-        pl = u.GetSystemMetrics(SM_XVIRTUALSCREEN)
-        pt = u.GetSystemMetrics(SM_YVIRTUALSCREEN)
-        pw = u.GetSystemMetrics(SM_CXVIRTUALSCREEN)
-        register_appbar(self._hwnd, self._phys_h)
+        pl, pt, pw = _virtual_screen_metrics()
+        logical_rect = _all_screens_rect()
+        self.setGeometry(logical_rect.left(), logical_rect.top(), logical_rect.width(), BAR_HEIGHT)
+        register_appbar(self._hwnd, self._phys_h, register=not self._appbar_registered)
+        self._appbar_registered = True
         u.SetWindowPos(self._hwnd, HWND_TOPMOST, pl, pt, pw, self._phys_h,
                        SWP_NOACTIVATE | SWP_SHOWWINDOW)
 
     def paintEvent(self, _):
         p = QPainter(self)
-        p.fillRect(self.rect(), self._bg_color)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        grad = QLinearGradient(0, 0, 0, self.height())
+        grad.setColorAt(0.0, _mix(self._bg_color, QColor(255, 255, 255, 255), 0.015))
+        grad.setColorAt(1.0, _mix(self._bg_color, QColor(0, 0, 0, 255), 0.03))
+        p.fillRect(self.rect(), grad)
+        p.fillRect(QRect(0, self.height() - 1, self.width(), 1), BAR_EDGE)
         p.end()
 
     def contextMenuEvent(self, e):
@@ -1315,9 +1604,11 @@ class MenuBar(QWidget):
             global SETTINGS
             SETTINGS = _load_settings()
             log.info("Settings reloaded")
+            self._apply_settings()
         elif ch == a_restart:
             if self._hwnd:
                 unregister_appbar(self._hwnd)
+                self._appbar_registered = False
             subprocess.Popen([sys.executable] + sys.argv,
                              creationflags=subprocess.CREATE_NO_WINDOW)
             QApplication.quit()
@@ -1325,7 +1616,9 @@ class MenuBar(QWidget):
             QApplication.quit()
 
     def closeEvent(self, e):
-        if self._hwnd: unregister_appbar(self._hwnd)
+        if self._hwnd and self._appbar_registered:
+            unregister_appbar(self._hwnd)
+            self._appbar_registered = False
         super().closeEvent(e)
 
 # ─────────────────────────────────────────────────────────────
@@ -1364,8 +1657,13 @@ def main():
 
     if SETTINGS.get("use_accent_color"):
         _accent_color = _read_accent_color()
+    else:
+        _accent_color = None
+    _refresh_design_tokens()
 
-    bar = MenuBar()  # noqa: F841
+    global _BAR_INSTANCE
+    _BAR_INSTANCE = MenuBar()
+    bar = _BAR_INSTANCE
 
     # Re-anchor bar on display topology changes
     app.primaryScreenChanged.connect(bar._on_screen_change)
