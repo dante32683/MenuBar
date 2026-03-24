@@ -568,10 +568,10 @@ QToolTip {{
     color: {TEXT_COL};
     background-color: {_rgba(POPUP_BG)};
     border: 1px solid {_rgba(POPUP_BORDER)};
-    border-radius: 8px;
-    padding: 6px 8px;
+    border-radius: {POPUP_RADIUS}px;
+    padding: 7px 10px;
     font-family: "{_TEXT_FONT_FAMILY}";
-    font-size: 12px;
+    font-size: 11px;
 }}
 """
 
@@ -1511,18 +1511,30 @@ class WinLogoExtra(MenuExtra):
 # ─────────────────────────────────────────────────────────────
 #  Active window title
 # ─────────────────────────────────────────────────────────────
-class TitleLabel(QLabel):
+class TitleLabel(ElidedLabel):
     def __init__(self, parent=None):
-        super().__init__("Desktop", parent)
-        self.setFont(_ufont(10))
-        self.setStyleSheet(f"color:{TEXT_SEC_COL}; background:transparent;")
-        self.setMaximumWidth(340)
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        super().__init__(parent)
+        self._max_width = 340
+        self._text_padding = 12
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        self.setFade(True)
+        self.sync_style()
+        self.set_title("Desktop")
 
     def sync_style(self):
-        self.setFont(_ufont(10))
+        self.setFont(_ufont(TEXT_PT - 1))
         self.setStyleSheet(f"color:{TEXT_SEC_COL}; background:transparent;")
+        self.set_title(self.fullText() or "Desktop")
+
+    def set_title(self, text: str):
+        text = text or "Desktop"
+        desired_w = min(
+            self._max_width,
+            self.fontMetrics().horizontalAdvance(text) + self._text_padding,
+        )
+        self.setFixedWidth(max(72, desired_w))
+        self.setFullText(text)
 
 class MenuBar(QWidget):
     def __init__(self):
@@ -1754,8 +1766,7 @@ class MenuBar(QWidget):
             self._last_fg = fg
             if self.title:
                 title = get_active_window_title() or "Desktop"
-                self.title.setText(title)
-                self.title.setToolTip(title)
+                self.title.set_title(title)
         except Exception:
             log.debug("[poll_title] %s", traceback.format_exc())
 
