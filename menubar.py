@@ -31,10 +31,10 @@ log.info("Starting")
 import psutil
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout,
-    QLabel, QFrame, QSizePolicy,
+    QLabel, QFrame, QSizePolicy, QToolTip,
 )
-from PyQt6.QtCore import Qt, QTimer, QPoint, QRect, QRectF
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QFontDatabase, QLinearGradient
+from PyQt6.QtCore import Qt, QTimer, QPoint, QPointF, QRect, QRectF, QObject, QEvent
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QFontDatabase, QLinearGradient, QCursor
 
 # ── Media (optional — graceful fallback) ──────────────────────
 try:
@@ -201,6 +201,7 @@ def apply_backdrop(hwnd):
 _accent_color = None  # set in main()
 _BAR_INSTANCE = None
 ENABLE_NATIVE_INTEGRATION = True
+_TOOLTIP_FILTER = None
 
 def _read_accent_color() -> QColor | None:
     try:
@@ -453,6 +454,21 @@ ICON_ETHERNET  = "\uE839"
 ICON_BATT      = "\uE83F"
 ICON_BATT_CHG  = "\uEA93"
 ICON_POWER     = "\uE7E8"
+ICON_WIFI_1    = "\uE872"
+ICON_WIFI_2    = "\uE873"
+ICON_WIFI_3    = "\uE874"
+ICON_WIFI_NONE = "\uE871"
+
+BATTERY_GLYPHS = [
+    "\uE850", "\uE851", "\uE852", "\uE853", "\uE854",
+    "\uE855", "\uE856", "\uE857", "\uE858", "\uE859",
+    "\uE83F",
+]
+BATTERY_CHARGING_GLYPHS = [
+    "\uE85A", "\uE85B", "\uE85C", "\uE85D", "\uE85E",
+    "\uE85F", "\uE860", "\uE861", "\uE862", "\uE83E",
+    "\uEA93",
+]
 
 # ─────────────────────────────────────────────────────────────
 #  WinUI 3 design tokens & constants
@@ -546,6 +562,95 @@ def _refresh_design_tokens():
 
 _refresh_design_tokens()
 
+def _tooltip_ss() -> str:
+    return f"""
+QToolTip {{
+    color: {TEXT_COL};
+    background-color: {_rgba(POPUP_BG)};
+    border: 1px solid {_rgba(POPUP_BORDER)};
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-family: "{_TEXT_FONT_FAMILY}";
+    font-size: 12px;
+}}
+"""
+
+def _apply_app_style(app: QApplication):
+    global _TOOLTIP_FILTER
+    app.setFont(_ufont(TEXT_PT))
+    app.setStyleSheet(_tooltip_ss())
+    if _TOOLTIP_FILTER is None:
+        _TOOLTIP_FILTER = DelayedTooltipFilter(parent=app)
+        app.installEventFilter(_TOOLTIP_FILTER)
+
+class DelayedTooltipFilter(QObject):
+    def __init__(self, delay_ms=900, parent=None):
+        super().__init__(parent)
+        self._delay_ms = delay_ms
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._show_tooltip)
+        self._widget = None
+        self._pos = QPoint()
+
+    def eventFilter(self, obj, event):
+        if not isinstance(obj, QWidget):
+            return False
+
+        et = event.type()
+        if et in (QEvent.Type.Enter, QEvent.Type.HoverEnter):
+            target = self._tooltip_target(obj)
+            if target:
+                self._widget = target
+                self._pos = QCursor.pos()
+                self._timer.start(self._delay_ms)
+                QToolTip.hideText()
+            return False
+
+        if et == QEvent.Type.MouseMove and self._widget:
+            self._pos = QCursor.pos()
+            return False
+
+        if et in (
+            QEvent.Type.Leave,
+            QEvent.Type.HoverLeave,
+            QEvent.Type.Hide,
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.FocusOut,
+            QEvent.Type.WindowDeactivate,
+        ):
+            if obj is self._widget or self._is_child_of(obj, self._widget):
+                self._timer.stop()
+                self._widget = None
+                QToolTip.hideText()
+        return False
+
+    def _show_tooltip(self):
+        if not self._widget:
+            return
+        if not self._widget.isVisible():
+            self._widget = None
+            return
+        text = self._widget.toolTip()
+        if text:
+            QToolTip.showText(self._pos, text, self._widget, self._widget.rect(), 12000)
+
+    def _tooltip_target(self, widget):
+        cur = widget
+        while cur is not None:
+            if isinstance(cur, QWidget) and cur.toolTip():
+                return cur
+            cur = cur.parentWidget()
+        return None
+
+    def _is_child_of(self, widget, parent):
+        cur = widget
+        while cur is not None:
+            if cur is parent:
+                return True
+            cur = cur.parentWidget() if isinstance(cur, QWidget) else None
+        return False
+
 def _ifont(pt=ICON_PT) -> QFont:
     return QFont(_ICON_FONT, pt)
 
@@ -561,6 +666,88 @@ def _lbl(text, font, col=TEXT_COL, parent=None) -> QLabel:
     w.setStyleSheet(f"color:{col}; background:transparent;")
     w.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
     return w
+
+class GlyphLabel(QLabel):
+    def __init__(self, text="", pt=16, col=TEXT_COL, y_offset=0, parent=None):
+        super().__init__(text, parent)
+        self._color = col
+        self._y_offset = y_offset
+        self.setFont(_ifont(pt))
+        self.setStyleSheet(f"color:{col}; background:transparent;")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+    def set_color(self, col):
+        self._color = col
+        self.setStyleSheet(f"color:{col}; background:transparent;")
+
+    def set_y_offset(self, y_offset):
+        self._y_offset = y_offset
+
+def _glyph(text, pt=16, col=TEXT_COL, y_offset=0, parent=None) -> GlyphLabel:
+    return GlyphLabel(text, pt, col, y_offset, parent)
+
+class ElidedLabel(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._full_text = ""
+        self._fade = False
+
+    def setFullText(self, text: str):
+        self._full_text = text or ""
+        self._apply_elide()
+
+    def fullText(self) -> str:
+        return self._full_text
+
+    def setFade(self, fade: bool):
+        self._fade = fade
+        self.update()
+
+    def resizeEvent(self, e):
+        self._apply_elide()
+        super().resizeEvent(e)
+
+    def setFont(self, font):
+        super().setFont(font)
+        self._apply_elide()
+
+    def _apply_elide(self):
+        metrics = self.fontMetrics()
+        available = max(8, self.contentsRect().width())
+        elided = metrics.elidedText(self._full_text, Qt.TextElideMode.ElideRight, available)
+        super().setText(elided)
+        self.setToolTip(self._full_text if elided != self._full_text else "")
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        if not self._fade or not self.toolTip():
+            return
+        p = QPainter(self)
+        fade_w = min(28, max(18, self.width() // 6))
+        start = max(0, self.width() - fade_w)
+        grad = QLinearGradient(start, 0, self.width(), 0)
+        grad.setColorAt(0.0, QColor(0, 0, 0, 0))
+        grad.setColorAt(1.0, _DEFAULT_BAR_COLOR)
+        p.fillRect(QRect(start, 0, fade_w, self.height()), grad)
+        p.end()
+
+def _battery_level_bucket(percent: float | None) -> int:
+    if percent is None:
+        return 0
+    return max(0, min(10, int(round(percent / 10.0))))
+
+def _battery_glyph(percent: float | None, charging: bool) -> str:
+    bucket = _battery_level_bucket(percent)
+    return BATTERY_CHARGING_GLYPHS[bucket] if charging else BATTERY_GLYPHS[bucket]
+
+def _wifi_glyph(connected: bool, is_wifi: bool, signal: int) -> str:
+    if not connected:
+        return ICON_WIFI_NONE
+    if not is_wifi:
+        return ICON_ETHERNET
+    level = max(1, min(3, int(signal or 1)))
+    return {1: ICON_WIFI_1, 2: ICON_WIFI_2, 3: ICON_WIFI_3}[level]
 
 def _all_screens_rect() -> QRect:
     r = QRect()
@@ -830,9 +1017,8 @@ class BatteryPopup(InfoPopup):
 
         row = QWidget(self); row.setStyleSheet("background:transparent;")
         rl  = QHBoxLayout(row); rl.setContentsMargins(0, 4, 0, 4); rl.setSpacing(10)
-        ic  = BatteryDrawn(row)
-        ic.setFixedSize(32, 18)
-        ic.set_state(pct, chg)
+        ic  = _glyph(_battery_glyph(pct, chg), 20, TEXT_COL, 0, row)
+        ic.setFixedWidth(22)
         pct_lbl = QLabel(f"{int(pct)}%", row)
         pct_lbl.setFont(_ufont(16, bold=True))
         pct_lbl.setStyleSheet(f"color:{TEXT_COL}; background:transparent;")
@@ -1060,6 +1246,7 @@ class MenuExtra(QWidget):
     def sync_metrics(self):
         self.setFixedHeight(BAR_HEIGHT)
 
+
 # ─────────────────────────────────────────────────────────────
 #  Right-side extras
 # ─────────────────────────────────────────────────────────────
@@ -1067,10 +1254,12 @@ class BatteryExtra(MenuExtra):
     def __init__(self, parent=None):
         super().__init__(parent)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
-        lay.setSpacing(5)
-        self._icon = BatteryDrawn(self)
-        self._txt  = _lbl("", _ufont(TEXT_PT), TEXT_COL, self)
+        lay.setContentsMargins(6, 0, 8, 0)
+        lay.setSpacing(4)
+        lay.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        self._icon = _glyph("", 16, TEXT_COL, 0, self)
+        self._icon.setFixedSize(18, BAR_HEIGHT)
+        self._txt  = _lbl("", _ufont(TEXT_PT - 1), TEXT_COL, self)
         self._txt.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         lay.addWidget(self._icon, 0, Qt.AlignmentFlag.AlignVCenter)
         lay.addWidget(self._txt,  0, Qt.AlignmentFlag.AlignVCenter)
@@ -1081,17 +1270,23 @@ class BatteryExtra(MenuExtra):
     def refresh(self, info: dict):
         self._info = info
         if info["has_battery"]:
-            self._icon.set_state(info["percent"], info["charging"])
+            self._icon.setText(_battery_glyph(info["percent"], info["charging"]))
+            self._icon.setFont(_ifont(16))
+            self._icon.set_color(TEXT_COL)
             self._txt.setText(f'{int(info["percent"])}%')
+            status = "Charging" if info["charging"] else ("Plugged in" if info["plugged"] else "On battery")
+            self.setToolTip(f"Battery: {int(info['percent'])}%\n{status}")
             self._icon.show()
         else:
             self._icon.hide()
             self._txt.setText("AC")
+            self.setToolTip("Battery: AC power")
         self.adjustSize()
 
     def sync_metrics(self):
         super().sync_metrics()
-        self.layout().setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
+        self._icon.setFixedSize(18, BAR_HEIGHT)
+        self.layout().setContentsMargins(6, 0, 8, 0)
 
     def _on_click(self):
         if self._popup and self._popup.isVisible():
@@ -1107,9 +1302,11 @@ class NetworkExtra(MenuExtra):
     def __init__(self, parent=None):
         super().__init__(parent)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
+        lay.setContentsMargins(6, 0, 4, 0)
         lay.setSpacing(0)
-        self._icon = WifiIcon(self)
+        lay.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        self._icon = _glyph("", 16, TEXT_COL, 0, self)
+        self._icon.setFixedSize(18, BAR_HEIGHT)
         lay.addWidget(self._icon, 0, Qt.AlignmentFlag.AlignVCenter)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._info = {}
@@ -1117,12 +1314,22 @@ class NetworkExtra(MenuExtra):
 
     def refresh(self, info: dict):
         self._info = info
-        self._icon.set_state(info["connected"], info["signal"] if info["is_wifi"] else 3)
+        self._icon.setText(_wifi_glyph(info["connected"], info["is_wifi"], info["signal"]))
+        self._icon.setFont(_ifont(16))
+        self._icon.set_color(TEXT_COL)
+        if not info["connected"]:
+            self.setToolTip("Network: Not connected")
+        elif info["is_wifi"]:
+            ssid = info["wifi_name"] or "Wi-Fi"
+            self.setToolTip(f"Network: {ssid}")
+        else:
+            self.setToolTip("Network: Ethernet")
         self.adjustSize()
 
     def sync_metrics(self):
         super().sync_metrics()
-        self.layout().setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
+        self._icon.setFixedSize(18, BAR_HEIGHT)
+        self.layout().setContentsMargins(6, 0, 4, 0)
 
     def _on_click(self):
         if self._popup and self._popup.isVisible():
@@ -1152,6 +1359,7 @@ class ClockExtra(MenuExtra):
         else:
             hour = now.strftime("%I").lstrip("0") or "12"
             self._lbl.setText(now.strftime(f"%m/%d/%Y  {hour}:%M %p"))
+        self.setToolTip(now.strftime("%A, %B %d, %Y %I:%M:%S %p"))
         self.adjustSize()
 
     def _on_click(self):
@@ -1167,21 +1375,24 @@ class MediaExtra(MenuExtra):
     def __init__(self, parent=None):
         super().__init__(parent)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
-        lay.setSpacing(5)
+        lay.setContentsMargins(10, 0, 10, 0)
+        lay.setSpacing(8)
+        lay.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Playing indicator dot (uses accent color)
         self._dot = QWidget(self)
-        self._dot.setFixedSize(6, 6)
+        self._dot.setFixedSize(7, 7)
         self._dot.setStyleSheet("background: transparent; border-radius: 3px;")
         lay.addWidget(self._dot, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        self._txt = _lbl("", _ufont(TEXT_PT - 1), TEXT_SEC_COL, self)
+        self._txt = ElidedLabel(self)
+        self._txt.setFont(_ufont(TEXT_PT - 1))
+        self._txt.setStyleSheet(f"color:{TEXT_SEC_COL}; background:transparent;")
         self._txt.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        self._txt.setMaximumWidth(200)
-        lay.addWidget(self._txt, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._txt.setFixedWidth(108)
+        self._txt.setFade(True)
+        lay.addWidget(self._txt, 1, Qt.AlignmentFlag.AlignVCenter)
 
-        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._info = None
         self._popup = None
         self.hide()
@@ -1189,33 +1400,36 @@ class MediaExtra(MenuExtra):
     def refresh(self, info: dict | None):
         self._info = info
         if not info or (not info["title"] and not info["artist"]):
+            self.setToolTip("")
             self.hide()
             return
 
         parts = []
-        if info["artist"]:
-            parts.append(info["artist"])
         if info["title"]:
             parts.append(info["title"])
+        if info["artist"]:
+            parts.append(info["artist"])
         display = " \u2014 ".join(parts)
-        if len(display) > 45:
-            display = display[:44] + "\u2026"
-        self._txt.setText(display)
+        desired_w = max(92, min(310, self._txt.fontMetrics().horizontalAdvance(display) + 8))
+        self._txt.setFixedWidth(desired_w)
+        self._txt.setFullText(display)
+        self.setToolTip(display)
 
-        # Accent-colored dot when playing
         if info.get("playing"):
             self._dot.setStyleSheet(
                 "background: rgb(106,196,91); border-radius: 3px;")
+            self._txt.setStyleSheet(f"color:{TEXT_COL}; background:transparent;")
         else:
             self._dot.setStyleSheet(
                 "background: rgba(255,255,255,60); border-radius: 3px;")
+            self._txt.setStyleSheet(f"color:{TEXT_SEC_COL}; background:transparent;")
 
         self.show()
         self.adjustSize()
 
     def sync_metrics(self):
         super().sync_metrics()
-        self.layout().setContentsMargins(EXTRA_PAD, 0, EXTRA_PAD, 0)
+        self.layout().setContentsMargins(10, 0, 10, 0)
 
     def _on_click(self):
         if self._popup and self._popup.isVisible():
@@ -1265,6 +1479,7 @@ class WinLogoExtra(MenuExtra):
         lay.addWidget(WinLogo(self), 0,
                       Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
         self.setFixedWidth(34)
+        self.setToolTip("Power and system menu")
 
     def _on_click(self):
         from PyQt6.QtWidgets import QMenu
@@ -1439,6 +1654,9 @@ class MenuBar(QWidget):
         else:
             _accent_color = None
         _refresh_design_tokens()
+        app = QApplication.instance()
+        if app:
+            _apply_app_style(app)
 
         r = _all_screens_rect()
         self._phys_h = BAR_HEIGHT
@@ -1535,7 +1753,9 @@ class MenuBar(QWidget):
                 return
             self._last_fg = fg
             if self.title:
-                self.title.setText(get_active_window_title() or "Desktop")
+                title = get_active_window_title() or "Desktop"
+                self.title.setText(title)
+                self.title.setToolTip(title)
         except Exception:
             log.debug("[poll_title] %s", traceback.format_exc())
 
@@ -1660,6 +1880,7 @@ def main():
     else:
         _accent_color = None
     _refresh_design_tokens()
+    _apply_app_style(app)
 
     global _BAR_INSTANCE
     _BAR_INSTANCE = MenuBar()
