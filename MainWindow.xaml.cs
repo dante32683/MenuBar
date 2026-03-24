@@ -36,9 +36,9 @@ namespace MenuBar
 
         private readonly HardwareService _hwService = new HardwareService();
         private readonly SolidColorBrush _mediaPlayingBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 106, 196, 91));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
         private readonly SolidColorBrush _mediaPausedBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(60, 255, 255, 255));
+            new SolidColorBrush(Microsoft.UI.Colors.White);
         private readonly SolidColorBrush _mediaInactiveBrush =
             new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         private readonly SolidColorBrush _hoverBrush =
@@ -48,9 +48,9 @@ namespace MenuBar
         private readonly SolidColorBrush _transparentBrush =
             new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         private readonly SolidColorBrush _batteryDefaultBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(230, 255, 255, 255));
+            new SolidColorBrush(Microsoft.UI.Colors.White);
         private readonly SolidColorBrush _batteryChargingBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x9F, 0xD8, 0x9F));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
         private readonly SolidColorBrush _batterySaverBrush =
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0xEA, 0xA3, 0x00));
         private static readonly string[] MobileBatteryGlyphs =
@@ -345,8 +345,14 @@ namespace MenuBar
             {
                 ViewModel.BatteryText = $"{_batteryInfo.Percent}%";
                 ViewModel.BatteryIcon = GetBatteryFillGlyph(_batteryInfo.Percent);
-                BatteryFillGlyphText.Foreground = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging);
-                BatteryOutlineGlyphText.Visibility = Visibility.Visible;
+                var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging);
+                BatteryFillGlyphText.Foreground = brush;
+                
+                // Hide outline if the fill is white to avoid visual clashing
+                BatteryOutlineGlyphText.Visibility = (brush == _batteryDefaultBrush) 
+                    ? Visibility.Collapsed 
+                    : Visibility.Visible;
+                
                 BatteryBoltPath.Visibility = _batteryInfo.Charging ? Visibility.Visible : Visibility.Collapsed;
 
                 string status = _batteryInfo.Charging
