@@ -4,14 +4,22 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:viewmodels="using:MenuBar.ViewModels"
     mc:Ignorable="d"
     Title="MenuBar">
 
-    <Grid Background="Transparent">
-        <!-- Transparent background is handled by Mica material and custom brush from code-behind -->
+    <Grid x:Name="RootGrid" Background="Transparent">
+        <Grid.ContextFlyout>
+            <MenuFlyout>
+                <MenuFlyoutItem Text="Open settings" Click="OpenSettingsFile_Click" />
+                <MenuFlyoutItem Text="Reload settings" Click="ReloadSettings_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Restart bar" Click="RestartBar_Click" />
+                <MenuFlyoutItem Text="Stop bar" Click="StopBar_Click" />
+            </MenuFlyout>
+        </Grid.ContextFlyout>
+
         <Border x:Name="BackgroundBorder" Background="#B01C222A">
-            <Grid Padding="8,0,6,0">
+            <Grid x:Name="MainContentGrid" Padding="8,0,6,0" Margin="0,-1,0,1" VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -19,61 +27,205 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Section: Logo & Title -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <!-- Placeholder for Windows Logo -->
-                    <Grid Width="14" Height="14" Visibility="{x:Bind ViewModel.ShowLogo, Mode=OneWay}">
-                        <!-- Four white squares to represent the logo -->
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Rectangle Fill="White" Grid.Row="0" Grid.Column="0" Margin="0,0,1,1" />
-                        <Rectangle Fill="White" Grid.Row="0" Grid.Column="1" Margin="1,0,0,1" />
-                        <Rectangle Fill="White" Grid.Row="1" Grid.Column="0" Margin="0,1,1,0" />
-                        <Rectangle Fill="White" Grid.Row="1" Grid.Column="1" Margin="1,1,0,0" />
-                    </Grid>
+                    <Border x:Name="LogoHost"
+                            Visibility="{x:Bind ViewModel.LogoVisibility, Mode=OneWay}"
+                            Background="Transparent"
+                            CornerRadius="6"
+                            MinHeight="24"
+                            Padding="10,0"
+                            PointerEntered="Host_PointerEntered"
+                            PointerExited="Host_PointerExited"
+                            PointerPressed="Host_PointerPressed"
+                            PointerReleased="Host_PointerReleased"
+                            Tapped="LogoHost_Tapped">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{x:Bind ViewModel.LogoTooltip, Mode=OneWay}" />
+                        </ToolTipService.ToolTip>
+                        <FlyoutBase.AttachedFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Settings" Click="OpenWindowsSettings_Click" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Sleep" Click="SleepSystem_Click" />
+                                <MenuFlyoutItem Text="Restart" Click="RestartSystem_Click" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Shut down" Click="ShutdownSystem_Click" />
+                            </MenuFlyout>
+                        </FlyoutBase.AttachedFlyout>
+                        <Grid Width="14" Height="14">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Rectangle Fill="White" Grid.Row="0" Grid.Column="0" Margin="0,0,1,1" />
+                            <Rectangle Fill="White" Grid.Row="0" Grid.Column="1" Margin="1,0,0,1" />
+                            <Rectangle Fill="White" Grid.Row="1" Grid.Column="0" Margin="0,1,1,0" />
+                            <Rectangle Fill="White" Grid.Row="1" Grid.Column="1" Margin="1,1,0,0" />
+                        </Grid>
+                    </Border>
 
-                    <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitle, Mode=OneWay}" 
-                               Visibility="{x:Bind ViewModel.ShowTitle, Mode=OneWay}"
-                               Foreground="#B0FFFFFF" 
-                               FontSize="11" 
-                               VerticalAlignment="Center" 
-                               Margin="8,0,0,0"/>
+                    <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitle, Mode=OneWay}"
+                               Visibility="{x:Bind ViewModel.TitleVisibility, Mode=OneWay}"
+                               Foreground="#B0FFFFFF"
+                               FontSize="11"
+                               LineHeight="14"
+                               LineStackingStrategy="BlockLineHeight"
+                               MaxWidth="340"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{x:Bind ViewModel.ActiveWindowTitleTooltip, Mode=OneWay}" />
+                        </ToolTipService.ToolTip>
+                    </TextBlock>
                 </StackPanel>
 
-                <!-- Middle Section: Center Content (Empty or Media) -->
-                <!-- Currently keeping stretch to right align the right section -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border x:Name="MediaHost"
+                            Visibility="{x:Bind ViewModel.MediaVisibility, Mode=OneWay}"
+                            Background="Transparent"
+                            CornerRadius="6"
+                            MinHeight="24"
+                            Padding="10,0"
+                            PointerEntered="Host_PointerEntered"
+                            PointerExited="Host_PointerExited"
+                            PointerPressed="Host_PointerPressed"
+                            PointerReleased="Host_PointerReleased"
+                            Tapped="MediaHost_Tapped">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{x:Bind ViewModel.MediaTooltip, Mode=OneWay}" />
+                        </ToolTipService.ToolTip>
+                        <FlyoutBase.AttachedFlyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuFlyoutItem x:Name="MediaMenuTitleItem" Text="Nothing playing" />
+                                <MenuFlyoutItem x:Name="MediaMenuArtistItem" Text="" Visibility="Collapsed" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Previous" Click="MediaPrevious_Click" />
+                                <MenuFlyoutItem x:Name="MediaMenuPlayPauseItem" Text="Play / Pause" Click="MediaPlayPause_Click" />
+                                <MenuFlyoutItem Text="Next" Click="MediaNext_Click" />
+                            </MenuFlyout>
+                        </FlyoutBase.AttachedFlyout>
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}"
+                                       FontSize="11"
+                                       LineHeight="14"
+                                       LineStackingStrategy="BlockLineHeight"
+                                       MaxWidth="310"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="#B0FFFFFF"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
 
-                <!-- Right Section: Media, Network, Battery, Clock -->
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
-                    <!-- Media -->
-                    <StackPanel Orientation="Horizontal" Spacing="6" Visibility="{x:Bind ViewModel.ShowMedia, Mode=OneWay}" VerticalAlignment="Center">
-                        <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
-                        <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}" FontSize="11" Foreground="#B0FFFFFF" VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <Border x:Name="NetworkHost"
+                            Visibility="{x:Bind ViewModel.NetworkVisibility, Mode=OneWay}"
+                            Background="Transparent"
+                            CornerRadius="6"
+                            MinHeight="24"
+                            Padding="6,0"
+                            PointerEntered="Host_PointerEntered"
+                            PointerExited="Host_PointerExited"
+                            PointerPressed="Host_PointerPressed"
+                            PointerReleased="Host_PointerReleased"
+                            Tapped="NetworkHost_Tapped">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{x:Bind ViewModel.NetworkTooltip, Mode=OneWay}" />
+                        </ToolTipService.ToolTip>
+                        <FlyoutBase.AttachedFlyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuFlyoutItem x:Name="NetworkMenuPrimaryItem" Text="Not connected" />
+                                <MenuFlyoutItem x:Name="NetworkMenuSecondaryItem" Text="" Visibility="Collapsed" />
+                                <MenuFlyoutItem x:Name="NetworkMenuDownItem" Text="" Visibility="Collapsed" />
+                                <MenuFlyoutItem x:Name="NetworkMenuUpItem" Text="" Visibility="Collapsed" />
+                            </MenuFlyout>
+                        </FlyoutBase.AttachedFlyout>
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind ViewModel.NetworkIcon, Mode=OneWay}" FontFamily="Segoe Fluent Icons" FontSize="14" LineHeight="14" LineStackingStrategy="BlockLineHeight" Foreground="White" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
 
-                    <!-- Network -->
-                    <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ViewModel.ShowNetwork, Mode=OneWay}" VerticalAlignment="Center">
-                        <TextBlock Text="{x:Bind ViewModel.NetworkIcon, Mode=OneWay}" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="White" VerticalAlignment="Center" />
-                    </StackPanel>
+                    <Border x:Name="BatteryHost"
+                            Visibility="{x:Bind ViewModel.BatteryVisibility, Mode=OneWay}"
+                            Background="Transparent"
+                            CornerRadius="6"
+                            MinHeight="24"
+                            Padding="6,0"
+                            PointerEntered="Host_PointerEntered"
+                            PointerExited="Host_PointerExited"
+                            PointerPressed="Host_PointerPressed"
+                            PointerReleased="Host_PointerReleased"
+                            Tapped="BatteryHost_Tapped">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{x:Bind ViewModel.BatteryTooltip, Mode=OneWay}" />
+                        </ToolTipService.ToolTip>
+                        <FlyoutBase.AttachedFlyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuFlyoutItem x:Name="BatteryMenuPrimaryItem" Text="AC power — no battery detected" />
+                                <MenuFlyoutItem x:Name="BatteryMenuSecondaryItem" Text="" Visibility="Collapsed" />
+                                <MenuFlyoutItem x:Name="BatteryMenuTimeItem" Text="" Visibility="Collapsed" />
+                            </MenuFlyout>
+                        </FlyoutBase.AttachedFlyout>
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Grid Width="20" Height="18" VerticalAlignment="Center">
+                                <TextBlock x:Name="BatteryFillGlyphText"
+                                           Text="{x:Bind ViewModel.BatteryIcon, Mode=OneWay}"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="18"
+                                           LineHeight="18"
+                                           LineStackingStrategy="BlockLineHeight"
+                                           Foreground="White"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock x:Name="BatteryOutlineGlyphText"
+                                           Text="&#xEBA0;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="18"
+                                           LineHeight="18"
+                                           LineStackingStrategy="BlockLineHeight"
+                                           Foreground="White"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center" />
+                                <Path x:Name="BatteryBoltPath"
+                                      Visibility="Collapsed"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Top"
+                                      Fill="White"
+                                      Data="M 8,0 L 4.8,4.8 H 7.1 L 5.8,10 L 10,4.4 H 7.7 Z"
+                                      Stretch="Uniform"
+                                      Width="6.4"
+                                      Height="8.53"
+                                      Margin="0,-2,0,0" />
+                            </Grid>
+                            <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}" FontSize="11" LineHeight="14" LineStackingStrategy="BlockLineHeight" Foreground="White" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
 
-                    <!-- Battery -->
-                    <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ViewModel.ShowBattery, Mode=OneWay}" VerticalAlignment="Center">
-                        <TextBlock Text="{x:Bind ViewModel.BatteryIcon, Mode=OneWay}" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="White" VerticalAlignment="Center" />
-                        <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}" FontSize="11" Foreground="White" VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <!-- Clock -->
-                    <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}" 
-                               Visibility="{x:Bind ViewModel.ShowClock, Mode=OneWay}"
-                               FontSize="11" 
-                               Foreground="White" 
-                               VerticalAlignment="Center" />
+                    <Border x:Name="ClockHost"
+                            Visibility="{x:Bind ViewModel.ClockVisibility, Mode=OneWay}"
+                            Background="Transparent"
+                            CornerRadius="6"
+                            MinHeight="24"
+                            Padding="10,0"
+                            PointerEntered="Host_PointerEntered"
+                            PointerExited="Host_PointerExited"
+                            PointerPressed="Host_PointerPressed"
+                            PointerReleased="Host_PointerReleased"
+                            Tapped="ClockHost_Tapped">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{x:Bind ViewModel.ClockTooltip, Mode=OneWay}" />
+                        </ToolTipService.ToolTip>
+                        <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}"
+                                   FontSize="11"
+                                   LineHeight="14"
+                                   LineStackingStrategy="BlockLineHeight"
+                                   Foreground="White"
+                                   VerticalAlignment="Center" />
+                    </Border>
                 </StackPanel>
             </Grid>
         </Border>

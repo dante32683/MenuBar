@@ -1,7 +1,9 @@
 using System;
-using System.Management;
-using System.Net.NetworkInformation;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Text.RegularExpressions;
 
 namespace MenuBar.Services
 {
@@ -13,6 +15,7 @@ namespace MenuBar.Services
             public int Percent { get; set; }
             public bool Charging { get; set; }
             public bool PluggedIn { get; set; }
+            public int? SecondsRemaining { get; set; }
         }
 
         public class NetworkInfo
@@ -20,50 +23,38 @@ namespace MenuBar.Services
             public bool Connected { get; set; }
             public bool IsWifi { get; set; }
             public string Ssid { get; set; }
+            public int SignalLevel { get; set; }
+            public int? ReceiveRateMbps { get; set; }
+            public int? TransmitRateMbps { get; set; }
         }
 
         public BatteryInfo GetBatteryInfo()
         {
-            var info = new BatteryInfo { HasBattery = false };
+            var info = new BatteryInfo { HasBattery = false, PluggedIn = true };
 
             try
             {
-                using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_Battery"))
+                if (NativeMethods.GetSystemPowerStatus(out var status))
                 {
-                    foreach (ManagementObject mo in searcher.Get())
-                    {
-                        info.HasBattery = true;
-                        
-                        if (mo["EstimatedChargeRemaining"] != null)
-                        {
-                            info.Percent = Convert.ToInt32(mo["EstimatedChargeRemaining"]);
-                        }
+                    bool hasBattery = status.BatteryFlag != 128;
+                    info.HasBattery = hasBattery;
 
-                        if (mo["BatteryStatus"] != null)
-                        {
-                            int status = Convert.ToInt32(mo["BatteryStatus"]);
-                            // 2 = AC / Unknown, 6 = Charging, 7 = Charging & High, 8 = Charging & Low, 9 = Charging & Critical
-                            // 1 = Discharging
-                            info.Charging = (status == 6 || status == 7 || status == 8 || status == 9);
-                        }
+                    if (!hasBattery)
+                    {
+                        return info;
+                    }
+
+                    info.PluggedIn = status.ACLineStatus == 1;
+                    info.Percent = status.BatteryLifePercent == byte.MaxValue ? 0 : status.BatteryLifePercent;
+                    info.Charging = info.PluggedIn && info.Percent < 99;
+                    if (status.BatteryLifeTime != uint.MaxValue)
+                    {
+                        info.SecondsRemaining = (int)status.BatteryLifeTime;
                     }
                 }
-
-                // Check AC Power status
-                using (var searcher = new ManagementObjectSearcher("SELECT * FROM root\\CIMV2:Win32_ComputerSystem"))
-                {
-                    foreach (ManagementObject mo in searcher.Get())
-                    {
-                        // PCSystemType: 2 = Mobile (Laptop)
-                    }
-                }
-
-                // Another way to check AC: Win32_PortableBattery or SystemInformation?
-                // Let's use Win32_Battery and Win32_PortableBattery for simplicity, or just assume Charging == PluggedIn for now unless we query Win32_SystemEnclosure.
             }
             catch
             {
-                // Fallback or ignore
             }
 
             return info;
@@ -71,16 +62,17 @@ namespace MenuBar.Services
 
         public NetworkInfo GetNetworkInfo()
         {
-            var info = new NetworkInfo { Connected = false, IsWifi = false, Ssid = "" };
+            var info = new NetworkInfo { Connected = false, IsWifi = false, Ssid = string.Empty };
 
             try
             {
                 var interfaces = NetworkInterface.GetAllNetworkInterfaces()
-                    .Where(i => i.OperationalStatus == OperationalStatus.Up && 
-                                i.NetworkInterfaceType != NetworkInterfaceType.Loopback && 
+                    .Where(i => i.OperationalStatus == OperationalStatus.Up &&
+                                i.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
                                 i.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
 
                 var activeInterface = interfaces.FirstOrDefault(i => i.GetIPProperties().GatewayAddresses.Any());
+                var wlan = ParseWlanDetails();
 
                 if (activeInterface != null)
                 {
@@ -88,8 +80,24 @@ namespace MenuBar.Services
                     if (activeInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
                     {
                         info.IsWifi = true;
-                        info.Ssid = activeInterface.Name; // Not exact SSID, but interface name like "Wi-Fi" is fine for lightweight fallback.
+                        info.Ssid = activeInterface.Name;
                     }
+                    else if (activeInterface.Speed > 0)
+                    {
+                        int speedMbps = (int)(activeInterface.Speed / 1_000_000);
+                        info.ReceiveRateMbps = speedMbps;
+                        info.TransmitRateMbps = speedMbps;
+                    }
+                }
+
+                if (string.Equals(GetValue(wlan, "State"), "connected", StringComparison.OrdinalIgnoreCase))
+                {
+                    info.Connected = true;
+                    info.IsWifi = true;
+                    info.Ssid = GetValue(wlan, "SSID");
+                    info.SignalLevel = ParseSignal(GetValue(wlan, "Signal"));
+                    info.ReceiveRateMbps = ParseInt(GetValue(wlan, "Receive rate (Mbps)"));
+                    info.TransmitRateMbps = ParseInt(GetValue(wlan, "Transmit rate (Mbps)"));
                 }
             }
             catch
@@ -97,6 +105,74 @@ namespace MenuBar.Services
             }
 
             return info;
+        }
+
+        private static Dictionary<string, string> ParseWlanDetails()
+        {
+            var data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                using var process = new Process();
+                process.StartInfo.FileName = "netsh";
+                process.StartInfo.Arguments = "wlan show interfaces";
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardError = true;
+                process.StartInfo.CreateNoWindow = true;
+
+                process.Start();
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit(3000);
+
+                foreach (string rawLine in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string line = rawLine.Trim();
+                    int separator = line.IndexOf(':');
+                    if (separator <= 0)
+                    {
+                        continue;
+                    }
+
+                    string key = line.Substring(0, separator).Trim();
+                    string value = line.Substring(separator + 1).Trim();
+                    if (!data.ContainsKey(key))
+                    {
+                        data[key] = value;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return data;
+        }
+
+        private static string GetValue(Dictionary<string, string> data, string key)
+        {
+            return data.TryGetValue(key, out string value) ? value : string.Empty;
+        }
+
+        private static int ParseSignal(string value)
+        {
+            int percent = ParseInt(Regex.Replace(value ?? string.Empty, @"[^\d]", string.Empty)) ?? 0;
+            if (percent >= 67)
+            {
+                return 3;
+            }
+
+            if (percent >= 34)
+            {
+                return 2;
+            }
+
+            return percent > 0 ? 1 : 0;
+        }
+
+        private static int? ParseInt(string value)
+        {
+            return int.TryParse(value, out int parsed) ? parsed : null;
         }
     }
 }

@@ -15,61 +15,149 @@ namespace MenuBar.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
+        private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (Equals(field, value))
+            {
+                return false;
+            }
+
+            field = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
+
         private string _activeWindowTitle = "Desktop";
         public string ActiveWindowTitle
         {
             get => _activeWindowTitle;
-            set { _activeWindowTitle = value; OnPropertyChanged(); }
+            set => SetProperty(ref _activeWindowTitle, value);
+        }
+
+        private string _activeWindowTitleTooltip = "Desktop";
+        public string ActiveWindowTitleTooltip
+        {
+            get => _activeWindowTitleTooltip;
+            set => SetProperty(ref _activeWindowTitleTooltip, value);
         }
 
         private string _clockText = "";
         public string ClockText
         {
             get => _clockText;
-            set { _clockText = value; OnPropertyChanged(); }
+            set => SetProperty(ref _clockText, value);
+        }
+
+        private string _clockTooltip = "";
+        public string ClockTooltip
+        {
+            get => _clockTooltip;
+            set => SetProperty(ref _clockTooltip, value);
         }
 
         private string _batteryIcon = "\uE83F"; // default battery
         public string BatteryIcon
         {
             get => _batteryIcon;
-            set { _batteryIcon = value; OnPropertyChanged(); }
+            set => SetProperty(ref _batteryIcon, value);
         }
 
         private string _batteryText = "100%";
         public string BatteryText
         {
             get => _batteryText;
-            set { _batteryText = value; OnPropertyChanged(); }
+            set => SetProperty(ref _batteryText, value);
+        }
+
+        private string _batteryTooltip = "Battery";
+        public string BatteryTooltip
+        {
+            get => _batteryTooltip;
+            set => SetProperty(ref _batteryTooltip, value);
         }
 
         private string _networkIcon = "\uE701"; // default wifi
         public string NetworkIcon
         {
             get => _networkIcon;
-            set { _networkIcon = value; OnPropertyChanged(); }
+            set => SetProperty(ref _networkIcon, value);
+        }
+
+        private string _networkTooltip = "Network";
+        public string NetworkTooltip
+        {
+            get => _networkTooltip;
+            set => SetProperty(ref _networkTooltip, value);
         }
 
         private string _mediaText = "Nothing playing";
         public string MediaText
         {
             get => _mediaText;
-            set { _mediaText = value; OnPropertyChanged(); }
+            set => SetProperty(ref _mediaText, value);
+        }
+
+        private string _mediaTooltip = "";
+        public string MediaTooltip
+        {
+            get => _mediaTooltip;
+            set => SetProperty(ref _mediaTooltip, value);
         }
 
         private Brush _mediaIndicatorBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         public Brush MediaIndicatorBrush
         {
             get => _mediaIndicatorBrush;
-            set { _mediaIndicatorBrush = value; OnPropertyChanged(); }
+            set => SetProperty(ref _mediaIndicatorBrush, value);
         }
 
-        // Visibility toggles based on settings
-        public Visibility ShowLogo => Visibility.Visible;
-        public Visibility ShowTitle => Visibility.Visible;
-        public Visibility ShowMedia => Visibility.Visible;
-        public Visibility ShowNetwork => Visibility.Visible;
-        public Visibility ShowBattery => Visibility.Visible;
-        public Visibility ShowClock => Visibility.Visible;
+        private string _logoTooltip = "Power and system menu";
+        public string LogoTooltip
+        {
+            get => _logoTooltip;
+            set => SetProperty(ref _logoTooltip, value);
+        }
+
+        private Visibility _logoVisibility = Visibility.Visible;
+        public Visibility LogoVisibility
+        {
+            get => _logoVisibility;
+            set => SetProperty(ref _logoVisibility, value);
+        }
+
+        private Visibility _titleVisibility = Visibility.Visible;
+        public Visibility TitleVisibility
+        {
+            get => _titleVisibility;
+            set => SetProperty(ref _titleVisibility, value);
+        }
+
+        private Visibility _mediaVisibility = Visibility.Collapsed;
+        public Visibility MediaVisibility
+        {
+            get => _mediaVisibility;
+            set => SetProperty(ref _mediaVisibility, value);
+        }
+
+        private Visibility _networkVisibility = Visibility.Visible;
+        public Visibility NetworkVisibility
+        {
+            get => _networkVisibility;
+            set => SetProperty(ref _networkVisibility, value);
+        }
+
+        private Visibility _batteryVisibility = Visibility.Visible;
+        public Visibility BatteryVisibility
+        {
+            get => _batteryVisibility;
+            set => SetProperty(ref _batteryVisibility, value);
+        }
+
+        private Visibility _clockVisibility = Visibility.Visible;
+        public Visibility ClockVisibility
+        {
+            get => _clockVisibility;
+            set => SetProperty(ref _clockVisibility, value);
+        }
     }
 }

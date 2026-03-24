@@ -1,0 +1,11 @@
+{
+  "bar_height": 28,
+  "show_battery": true,
+  "show_network": true,
+  "show_clock": true,
+  "show_media": true,
+  "show_title": true,
+  "clock_24h": false,
+  "use_accent_color": true,
+  "show_windows_logo": false
+}

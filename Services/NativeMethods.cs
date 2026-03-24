@@ -25,6 +25,12 @@ namespace MenuBar.Services
         public const int GWL_EXSTYLE = -20;
         public const int WS_EX_TOOLWINDOW = 0x00000080;
         public const int WS_EX_APPWINDOW = 0x00040000;
+        public const int KEYEVENTF_KEYUP = 0x0002;
+        public const byte VK_LWIN = 0x5B;
+        public const byte VK_N = 0x4E;
+        public const byte VK_MEDIA_PLAY_PAUSE = 0xB3;
+        public const byte VK_MEDIA_NEXT_TRACK = 0xB0;
+        public const byte VK_MEDIA_PREV_TRACK = 0xB1;
 
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT
@@ -44,6 +50,17 @@ namespace MenuBar.Services
             public int uEdge;
             public RECT rc;
             public IntPtr lParam;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct SYSTEM_POWER_STATUS
+        {
+            public byte ACLineStatus;
+            public byte BatteryFlag;
+            public byte BatteryLifePercent;
+            public byte SystemStatusFlag;
+            public uint BatteryLifeTime;
+            public uint BatteryFullLifeTime;
         }
 
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
@@ -67,6 +84,13 @@ namespace MenuBar.Services
         
         [DllImport("user32.dll")]
         public static extern int GetSystemMetrics(int nIndex);
+
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS systemPowerStatus);
+
+        [DllImport("user32.dll")]
+        public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
         public const int SM_XVIRTUALSCREEN = 76;
         public const int SM_YVIRTUALSCREEN = 77;
