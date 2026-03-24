@@ -1,0 +1,82 @@
+<Window
+    x:Class="MenuBar.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewmodels="using:MenuBar.ViewModels"
+    mc:Ignorable="d"
+    Title="MenuBar">
+
+    <Grid Background="Transparent">
+        <!-- Transparent background is handled by Mica material and custom brush from code-behind -->
+        <Border x:Name="BackgroundBorder" Background="#B01C222A">
+            <Grid Padding="8,0,6,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Section: Logo & Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <!-- Placeholder for Windows Logo -->
+                    <Grid Width="14" Height="14" Visibility="{x:Bind ViewModel.ShowLogo, Mode=OneWay}">
+                        <!-- Four white squares to represent the logo -->
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Rectangle Fill="White" Grid.Row="0" Grid.Column="0" Margin="0,0,1,1" />
+                        <Rectangle Fill="White" Grid.Row="0" Grid.Column="1" Margin="1,0,0,1" />
+                        <Rectangle Fill="White" Grid.Row="1" Grid.Column="0" Margin="0,1,1,0" />
+                        <Rectangle Fill="White" Grid.Row="1" Grid.Column="1" Margin="1,1,0,0" />
+                    </Grid>
+
+                    <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitle, Mode=OneWay}" 
+                               Visibility="{x:Bind ViewModel.ShowTitle, Mode=OneWay}"
+                               Foreground="#B0FFFFFF" 
+                               FontSize="11" 
+                               VerticalAlignment="Center" 
+                               Margin="8,0,0,0"/>
+                </StackPanel>
+
+                <!-- Middle Section: Center Content (Empty or Media) -->
+                <!-- Currently keeping stretch to right align the right section -->
+
+                <!-- Right Section: Media, Network, Battery, Clock -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                    <!-- Media -->
+                    <StackPanel Orientation="Horizontal" Spacing="6" Visibility="{x:Bind ViewModel.ShowMedia, Mode=OneWay}" VerticalAlignment="Center">
+                        <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}" FontSize="11" Foreground="#B0FFFFFF" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Network -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ViewModel.ShowNetwork, Mode=OneWay}" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.NetworkIcon, Mode=OneWay}" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="White" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Battery -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ViewModel.ShowBattery, Mode=OneWay}" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.BatteryIcon, Mode=OneWay}" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="White" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}" FontSize="11" Foreground="White" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Clock -->
+                    <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}" 
+                               Visibility="{x:Bind ViewModel.ShowClock, Mode=OneWay}"
+                               FontSize="11" 
+                               Foreground="White" 
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Border VerticalAlignment="Bottom" Height="1" Background="#18FFFFFF" />
+    </Grid>
+</Window>
