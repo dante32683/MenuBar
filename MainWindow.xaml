@@ -243,7 +243,7 @@
                                 <MenuFlyoutItem x:Name="BatteryMenuTimeItem" Text="" Visibility="Collapsed" />
                             </MenuFlyout>
                         </FlyoutBase.AttachedFlyout>
-                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <Grid Width="22" VerticalAlignment="Center">
                                 <TextBlock x:Name="BatteryFillGlyphText"
                                            Text="{x:Bind ViewModel.BatteryIcon, Mode=OneWay}"
