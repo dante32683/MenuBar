@@ -55,6 +55,12 @@ namespace MenuBar.Services
         [JsonPropertyName("font_size_icon")]
         public double FontSizeIcon { get; set; } = 0;
 
+        [JsonPropertyName("show_app_menu")]
+        public bool ShowAppMenu { get; set; } = false;
+
+        [JsonPropertyName("show_virtual_desktop")]
+        public bool ShowVirtualDesktop { get; set; } = false;
+
         public static MenuBarSettings CreateDefault()
         {
             return new MenuBarSettings();

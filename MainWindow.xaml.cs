@@ -38,6 +38,8 @@ namespace MenuBar
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(25, 255, 255, 255));
         private readonly SolidColorBrush _transparentBrush =
             new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        private readonly SolidColorBrush _pillNormalBrush =
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x1A, 255, 255, 255));
         private readonly SolidColorBrush _batteryDefaultBrush =
             new SolidColorBrush(Microsoft.UI.Colors.White);
         private readonly SolidColorBrush _batteryChargingBrush =
@@ -68,6 +70,16 @@ namespace MenuBar
         private readonly Windows.UI.ViewManagement.UISettings _uiSettings = new();
         private HardwareService.BatteryInfo _batteryInfo = new HardwareService.BatteryInfo();
         private HardwareService.NetworkInfo _networkInfo = new HardwareService.NetworkInfo();
+        private IntPtr _desktopSwitchHook;
+        private NativeMethods.WinEventDelegate _desktopSwitchDelegate;
+        private IntPtr _appMenuTargetHwnd;
+
+        private sealed class AppMenuItem
+        {
+            public uint Index;
+            public IntPtr TargetHwnd;
+            public IntPtr SubMenuHandle;
+        }
 
         public MainWindow()
         {
@@ -83,6 +95,7 @@ namespace MenuBar
 
             UpdateClock();
             UpdateActiveWindow();
+            UpdateVirtualDesktop();
             UpdateBattery();
             UpdateNetwork();
 
@@ -139,7 +152,13 @@ namespace MenuBar
             int screenX = NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
             int screenY = NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
             int screenW = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXVIRTUALSCREEN);
+
+            // barHeight is in DIPs (logical pixels) as configured by the user.
+            // Win32 APIs (SetWindowPos, SHAppBarMessage) require physical pixels.
             int barHeight = _settings.GetEffectiveBarHeight();
+            uint dpi = NativeMethods.GetDpiForWindow(_hwnd);
+            double dpiScale = dpi > 0 ? dpi / 96.0 : 1.0;
+            int physBarHeight = (int)Math.Round(barHeight * dpiScale);
 
             NativeMethods.APPBARDATA abd = new NativeMethods.APPBARDATA
             {
@@ -157,12 +176,13 @@ namespace MenuBar
             abd.rc.left = screenX;
             abd.rc.top = screenY;
             abd.rc.right = screenX + screenW;
-            abd.rc.bottom = screenY + barHeight;
+            abd.rc.bottom = screenY + physBarHeight;       // physical pixels
 
             NativeMethods.SHAppBarMessage(NativeMethods.ABM_QUERYPOS, ref abd);
-            abd.rc.bottom = abd.rc.top + barHeight;
+            abd.rc.bottom = abd.rc.top + physBarHeight;    // physical pixels
             NativeMethods.SHAppBarMessage(NativeMethods.ABM_SETPOS, ref abd);
 
+            // XAML properties are in DIPs — do not use physBarHeight here.
             BackgroundBorder.Height = barHeight;
             MainContentGrid.Height = barHeight;
             NativeMethods.SetWindowPos(
@@ -171,7 +191,7 @@ namespace MenuBar
                 screenX,
                 screenY,
                 screenW,
-                barHeight,
+                physBarHeight,                             // physical pixels
                 NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
         }
 
@@ -205,6 +225,13 @@ namespace MenuBar
                 NativeMethods.EVENT_OBJECT_NAMECHANGE,
                 IntPtr.Zero, _titleChangeDelegate, 0, 0,
                 NativeMethods.WINEVENT_OUTOFCONTEXT);
+
+            _desktopSwitchDelegate = OnDesktopSwitchEvent;
+            _desktopSwitchHook = NativeMethods.SetWinEventHook(
+                NativeMethods.EVENT_SYSTEM_DESKTOPSWITCH,
+                NativeMethods.EVENT_SYSTEM_DESKTOPSWITCH,
+                IntPtr.Zero, _desktopSwitchDelegate, 0, 0,
+                NativeMethods.WINEVENT_OUTOFCONTEXT);
         }
 
         private void OnForegroundEvent(IntPtr hook, uint eventType, IntPtr hwnd,
@@ -213,6 +240,15 @@ namespace MenuBar
             if (hwnd != IntPtr.Zero && hwnd != _hwnd)
                 _lastExternalForegroundHwnd = hwnd;
             UpdateActiveWindow();
+            // UpdateVirtualDesktop is NOT called here — CurrentVirtualDesktop only changes
+            // on desktop switches, which are handled by OnDesktopSwitchEvent exclusively.
+        }
+
+        private void OnDesktopSwitchEvent(IntPtr hook, uint eventType, IntPtr hwnd,
+            int idObject, int idChild, uint threadId, uint time)
+        {
+            _appMenuTargetHwnd = IntPtr.Zero; // force menu rebuild on next foreground event
+            UpdateVirtualDesktop();
         }
 
         private void OnTitleChangeEvent(IntPtr hook, uint eventType, IntPtr hwnd,
@@ -281,6 +317,8 @@ namespace MenuBar
             ViewModel.NetworkVisibility = ToVisibility(_settings.ShowNetwork);
             ViewModel.BatteryVisibility = ToVisibility(_settings.ShowBattery);
             ViewModel.ClockVisibility = ToVisibility(_settings.ShowClock);
+            ViewModel.VirtualDesktopVisibility = ToVisibility(_settings.ShowVirtualDesktop);
+            AppMenuPanel.Visibility = ToVisibility(_settings.ShowAppMenu);
             ViewModel.LogoTooltip = "Power and system menu";
 
             int barHeight = _settings.GetEffectiveBarHeight();
@@ -289,6 +327,16 @@ namespace MenuBar
 
             ApplyMediaState(_mediaService?.CurrentState ?? MediaService.MediaState.Empty);
             ApplyBackgroundColor();
+
+            if (_settings.ShowAppMenu)
+            {
+                _appMenuTargetHwnd = IntPtr.Zero; // force rebuild with new font size
+                RefreshAppMenu();
+            }
+            else
+            {
+                AppMenuPanel.Children.Clear();
+            }
         }
 
         #endregion
@@ -344,7 +392,7 @@ namespace MenuBar
                 title = title[.._settings.TitleMaxLength] + "\u2026";
             ViewModel.ActiveWindowTitle = title;
 
-            // Only re-fetch icon when the foreground window itself changes, not on title-only updates.
+            // Only re-fetch icon and menu when the foreground window itself changes, not on title-only updates.
             // This avoids GDI allocation on every browser tab title change, etc.
             if (foreground != _lastForegroundHwnd)
             {
@@ -352,6 +400,9 @@ namespace MenuBar
                 ImageSource icon = GetWindowIconBitmap(foreground);
                 ViewModel.ActiveWindowIcon = icon;
                 ViewModel.ActiveWindowIconVisibility = icon != null ? Visibility.Visible : Visibility.Collapsed;
+
+                if (_settings.ShowAppMenu)
+                    RefreshAppMenu();
             }
         }
 
@@ -506,6 +557,104 @@ namespace MenuBar
             }
         }
 
+        private void UpdateVirtualDesktop()
+        {
+            if (!_settings.ShowVirtualDesktop) return;
+
+            // Registry-based: reads CurrentVirtualDesktop which Windows updates atomically
+            // on every switch, before EVENT_SYSTEM_DESKTOPSWITCH fires. No hwnd needed.
+            string label = VirtualDesktopService.GetCurrentDesktopLabel();
+            if (label != null)
+                ViewModel.VirtualDesktopText = label;
+        }
+
+        private void RefreshAppMenu()
+        {
+            if (!_settings.ShowAppMenu) return;
+
+            IntPtr foreground = NativeMethods.GetForegroundWindow();
+            if (foreground == IntPtr.Zero || foreground == _hwnd)
+            {
+                AppMenuPanel.Children.Clear();
+                _appMenuTargetHwnd = IntPtr.Zero;
+                return;
+            }
+
+            // Walk to root — GetMenu only works on the top-level frame, not child controls
+            IntPtr hwnd = NativeMethods.GetAncestor(foreground, NativeMethods.GA_ROOT);
+            if (hwnd == IntPtr.Zero || hwnd == _hwnd) hwnd = foreground;
+
+            // Skip rebuild if targeting the same window
+            if (hwnd == _appMenuTargetHwnd) return;
+            _appMenuTargetHwnd = hwnd;
+
+            AppMenuPanel.Children.Clear();
+
+            IntPtr hMenu = NativeMethods.GetMenu(hwnd);
+            if (hMenu == IntPtr.Zero) return;
+
+            int count = NativeMethods.GetMenuItemCount(hMenu);
+            if (count <= 0) return;
+
+            double fontSize = ViewModel.TextFontSize;
+
+            for (uint i = 0; i < (uint)count; i++)
+            {
+                var mii = new NativeMethods.MENUITEMINFO
+                {
+                    cbSize = (uint)Marshal.SizeOf<NativeMethods.MENUITEMINFO>(),
+                    fMask = NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE |
+                            NativeMethods.MIIM_STRING | NativeMethods.MIIM_SUBMENU,
+                    dwTypeData = new string('\0', 256),
+                    cch = 256
+                };
+
+                if (!NativeMethods.GetMenuItemInfo(hMenu, i, true, ref mii)) continue;
+                if ((mii.fType & NativeMethods.MFT_SEPARATOR) != 0) continue;
+                if ((mii.fType & NativeMethods.MFT_BITMAP) != 0) continue;
+
+                string label = mii.dwTypeData?.Split('\t')[0].Replace("&", string.Empty).TrimEnd('\0')
+                               ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(label)) continue;
+
+                bool grayed = (mii.fState & NativeMethods.MFS_GRAYED) != 0;
+                IntPtr subMenu = mii.hSubMenu;
+                IntPtr targetHwnd = hwnd;
+
+                var textBlock = new TextBlock
+                {
+                    Text = label,
+                    FontFamily = new FontFamily("Segoe UI Variable"),
+                    FontSize = fontSize,
+                    Foreground = grayed
+                        ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 120, 120, 120))
+                        : new SolidColorBrush(Microsoft.UI.Colors.White),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                var border = new Border
+                {
+                    Background = _transparentBrush,
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(8, 0, 8, 0),
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    Tag = new AppMenuItem { Index = i, TargetHwnd = targetHwnd, SubMenuHandle = subMenu },
+                    Child = textBlock
+                };
+
+                if (!grayed)
+                {
+                    border.PointerEntered += Host_PointerEntered;
+                    border.PointerExited += Host_PointerExited;
+                    border.PointerPressed += Host_PointerPressed;
+                    border.PointerReleased += Host_PointerReleased;
+                    border.Tapped += AppMenuItem_Tapped;
+                }
+
+                AppMenuPanel.Children.Add(border);
+            }
+        }
+
         private void ApplyMediaState(MediaService.MediaState state)
         {
             if (_settings.ShowMedia && state.HasContent)
@@ -653,6 +802,55 @@ namespace MenuBar
             UpdateBattery();
             UpdateBatteryFlyout();
             ToggleAttachedFlyout((FrameworkElement)sender);
+        }
+
+        private void VirtualDesktopHost_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border b) b.Background = _hoverBrush;
+        }
+
+        private void VirtualDesktopHost_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border b) b.Background = _pillNormalBrush;
+        }
+
+        private void VirtualDesktopHost_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border b) b.Background = _pressedBrush;
+        }
+
+        private void VirtualDesktopHost_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border b) b.Background = _hoverBrush;
+        }
+
+        private void VirtualDesktopHost_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            SendKeyChord(NativeMethods.VK_LWIN, NativeMethods.VK_TAB);
+        }
+
+        private void AppMenuItem_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is not Border border) return;
+            if (border.Tag is not AppMenuItem item) return;
+            if (item.SubMenuHandle == IntPtr.Zero) return;
+
+            GeneralTransform transform = border.TransformToVisual(null);
+            Windows.Foundation.Point pt = transform.TransformPoint(
+                new Windows.Foundation.Point(0, border.ActualHeight));
+            double scale = Content.XamlRoot?.RasterizationScale ?? 1.0;
+            int sx = (int)(pt.X * scale) + NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
+            int sy = (int)(pt.Y * scale) + NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
+
+            int cmd = NativeMethods.TrackPopupMenu(
+                item.SubMenuHandle,
+                NativeMethods.TPM_TOPALIGN | NativeMethods.TPM_LEFTALIGN |
+                NativeMethods.TPM_RETURNCMD | NativeMethods.TPM_NONOTIFY,
+                sx, sy, 0, _hwnd, IntPtr.Zero);
+
+            if (cmd > 0)
+                NativeMethods.PostMessage(item.TargetHwnd, NativeMethods.WM_COMMAND,
+                    (IntPtr)cmd, IntPtr.Zero);
         }
 
         private void ClockHost_Tapped(object sender, TappedRoutedEventArgs e)
@@ -919,6 +1117,11 @@ namespace MenuBar
             if (_titleChangeHook != IntPtr.Zero)
             {
                 NativeMethods.UnhookWinEvent(_titleChangeHook);
+            }
+
+            if (_desktopSwitchHook != IntPtr.Zero)
+            {
+                NativeMethods.UnhookWinEvent(_desktopSwitchHook);
             }
 
             _mediaService?.Dispose();

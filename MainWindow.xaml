@@ -51,7 +51,7 @@
         </Grid.ContextFlyout>
 
         <Border x:Name="BackgroundBorder">
-            <Grid x:Name="MainContentGrid" Padding="12,0" VerticalAlignment="Stretch">
+            <Grid x:Name="MainContentGrid" Padding="12,3" VerticalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -125,6 +125,12 @@
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                Margin="4,0,0,0" />
+
+                    <!-- App menu items are added here dynamically by RefreshAppMenu() -->
+                    <StackPanel x:Name="AppMenuPanel"
+                                Orientation="Horizontal"
+                                Spacing="0"
+                                VerticalAlignment="Stretch" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Stretch">
@@ -409,6 +415,31 @@
                                    VerticalAlignment="Center" />
                     </Border>
                 </StackPanel>
+
+                <!-- Virtual desktop pill — centered over the full bar width -->
+                <Border x:Name="VirtualDesktopHost"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="4"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="{x:Bind ViewModel.VirtualDesktopVisibility, Mode=OneWay}"
+                        Background="#1AFFFFFF"
+                        BorderBrush="#40FFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="10,3"
+                        PointerEntered="VirtualDesktopHost_PointerEntered"
+                        PointerExited="VirtualDesktopHost_PointerExited"
+                        PointerPressed="VirtualDesktopHost_PointerPressed"
+                        PointerReleased="VirtualDesktopHost_PointerReleased"
+                        Tapped="VirtualDesktopHost_Tapped">
+                    <TextBlock Text="{x:Bind ViewModel.VirtualDesktopText, Mode=OneWay}"
+                               FontFamily="Segoe UI Variable"
+                               FontWeight="SemiBold"
+                               FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
+                               Foreground="White"
+                               VerticalAlignment="Center" />
+                </Border>
             </Grid>
         </Border>
         <Border VerticalAlignment="Bottom" Height="1" Background="#18FFFFFF" />

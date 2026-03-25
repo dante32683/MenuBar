@@ -41,7 +41,31 @@ namespace MenuBar.Services
         // WinEvent hooks
         public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
         public const uint EVENT_OBJECT_NAMECHANGE = 0x800C;
+        public const uint EVENT_SYSTEM_DESKTOPSWITCH = 0x0020;
         public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+
+        // Menu
+        public const int MF_BYPOSITION = 0x0400;
+        public const uint MFT_SEPARATOR = 0x0800;
+        public const uint MFT_BITMAP    = 0x0004;
+        public const uint MFS_GRAYED    = 0x0003;
+        public const uint MIIM_STATE    = 0x0001;
+        public const uint MIIM_ID      = 0x0002;
+        public const uint MIIM_SUBMENU = 0x0004;
+        public const uint MIIM_FTYPE   = 0x0100;
+        public const uint MIIM_STRING  = 0x0040;
+
+        // TrackPopupMenu flags
+        public const uint TPM_TOPALIGN    = 0x0000;
+        public const uint TPM_LEFTALIGN   = 0x0000;
+        public const uint TPM_RETURNCMD   = 0x0100;
+        public const uint TPM_NONOTIFY    = 0x0080;
+
+        // Messages
+        public const int WM_COMMAND = 0x0111;
+
+        // Keyboard
+        public const byte VK_TAB = 0x09;
 
         // Window icon messages
         public const int WM_GETICON = 0x007F;
@@ -52,6 +76,9 @@ namespace MenuBar.Services
         // Class long indices for icon handles
         public const int GCLP_HICONSM = -34;
         public const int GCLP_HICON = -14;
+
+        // GetAncestor flags
+        public const int GA_ROOT = 2;
 
         // GDI / DrawIconEx
         public const int DIB_RGB_COLORS = 0;
@@ -131,6 +158,12 @@ namespace MenuBar.Services
         public static extern IntPtr GetForegroundWindow();
 
         [DllImport("user32.dll")]
+        public static extern uint GetDpiForWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetAncestor(IntPtr hWnd, int gaFlags);
+
+        [DllImport("user32.dll")]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -195,5 +228,42 @@ namespace MenuBar.Services
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon,
             int cxWidth, int cyWidth, int istepIfAniCur, IntPtr hbrFlickerFreeDraw, int diFlags);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct MENUITEMINFO
+        {
+            public uint   cbSize;
+            public uint   fMask;
+            public uint   fType;
+            public uint   fState;
+            public uint   wID;
+            public IntPtr hSubMenu;
+            public IntPtr hbmpChecked;
+            public IntPtr hbmpUnchecked;
+            public IntPtr dwItemData;
+            [MarshalAs(UnmanagedType.LPWStr)]
+            public string dwTypeData;
+            public uint   cch;
+            public IntPtr hbmpItem;
+        }
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetMenu(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern int GetMenuItemCount(IntPtr hMenu);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetMenuItemInfo(IntPtr hMenu, uint uItem,
+            [MarshalAs(UnmanagedType.Bool)] bool fByPosition, ref MENUITEMINFO lpmii);
+
+        [DllImport("user32.dll")]
+        public static extern int TrackPopupMenu(IntPtr hMenu, uint uFlags,
+            int x, int y, int nReserved, IntPtr hWnd, IntPtr prcRect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool PostMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
     }
 }

@@ -194,5 +194,19 @@ namespace MenuBar.ViewModels
             get => _textFontSize;
             set => SetProperty(ref _textFontSize, value);
         }
+
+        private string _virtualDesktopText = "Desktop 1";
+        public string VirtualDesktopText
+        {
+            get => _virtualDesktopText;
+            set => SetProperty(ref _virtualDesktopText, value);
+        }
+
+        private Visibility _virtualDesktopVisibility = Visibility.Collapsed;
+        public Visibility VirtualDesktopVisibility
+        {
+            get => _virtualDesktopVisibility;
+            set => SetProperty(ref _virtualDesktopVisibility, value);
+        }
     }
 }

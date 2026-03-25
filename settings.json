@@ -15,7 +15,9 @@
     "title_max_length":   "Hard-truncate the window title at N characters (appends …). 0 = no limit.",
     "media_max_length":   "Hard-truncate the media bar text at N characters (appends …). 0 = no limit.",
     "font_size_text":     "Override text font size in pixels (battery %, time, title). 0 = auto-scale from bar_height.",
-    "font_size_icon":     "Override icon font size in pixels (battery, network glyphs). 0 = auto-scale from bar_height."
+    "font_size_icon":     "Override icon font size in pixels (battery, network glyphs). 0 = auto-scale from bar_height.",
+    "show_app_menu":      "Show the active window's application menu (File, Edit, …) as buttons on the left side. Requires the foreground app to have a Win32 menu.",
+    "show_virtual_desktop": "Show the current virtual desktop label (Desktop 1, Desktop 2, …) on the left side."
   },
 
   "bar_height": 28,
@@ -33,5 +35,7 @@
   "clock_show_date": true,
   "clock_date_format": "MM/dd/yyyy",
   "font_size_text": 0,
-  "font_size_icon": 0
+  "font_size_icon": 0,
+  "show_app_menu": false,
+  "show_virtual_desktop": false
 }
