@@ -1,32 +1,10 @@
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 
 namespace MenuBar.ViewModels
 {
-    public class MainViewModel : INotifyPropertyChanged
+    public class MainViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (Equals(field, value))
-            {
-                return false;
-            }
-
-            field = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
-
         private string _activeWindowTitle = "Desktop";
         public string ActiveWindowTitle
         {
@@ -55,7 +33,7 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _clockTooltip, value);
         }
 
-        private string _batteryIcon = "\uE83F"; // default battery
+        private string _batteryIcon = "\uE83F";
         public string BatteryIcon
         {
             get => _batteryIcon;
@@ -76,7 +54,7 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _batteryTooltip, value);
         }
 
-        private string _networkIcon = "\uE701"; // default wifi
+        private string _networkIcon = "\uE701";
         public string NetworkIcon
         {
             get => _networkIcon;

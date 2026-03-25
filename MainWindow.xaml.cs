@@ -14,28 +14,16 @@ using Microsoft.UI.Xaml.Media;
 using MenuBar.Services;
 using MenuBar.ViewModels;
 using WinRT.Interop;
-using Windows.Media.Control;
 
 namespace MenuBar
 {
     public sealed partial class MainWindow : Window
     {
-        private sealed class MediaState
-        {
-            public string Title { get; set; } = string.Empty;
-            public string Artist { get; set; } = string.Empty;
-            public bool Playing { get; set; }
-            public Microsoft.UI.Xaml.Media.ImageSource AlbumCover { get; set; }
-
-            public bool HasContent =>
-                !string.IsNullOrWhiteSpace(Title) || !string.IsNullOrWhiteSpace(Artist);
-
-            public static MediaState Empty => new MediaState();
-        }
-
         public MainViewModel ViewModel { get; } = new MainViewModel();
 
         private readonly HardwareService _hwService = new HardwareService();
+        private readonly MediaService _mediaService;
+
         private readonly SolidColorBrush _mediaPlayingBrush =
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
         private readonly SolidColorBrush _mediaPausedBrush =
@@ -54,43 +42,50 @@ namespace MenuBar
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
         private readonly SolidColorBrush _batterySaverBrush =
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0xEA, 0xA3, 0x00));
+
         private static readonly string[] MobileBatteryGlyphs =
         {
             "\uEBA0", "\uEBA1", "\uEBA2", "\uEBA3", "\uEBA4",
             "\uEBA5", "\uEBA6", "\uEBA7", "\uEBA8", "\uEBA9",
             "\uEBAA"
         };
-        private static readonly string[] MobileBatteryChargingGlyphs =
-        {
-            "\uEBAB", "\uEBAC", "\uEBAD", "\uEBAE", "\uEBAF",
-            "\uEBB0", "\uEBB1", "\uEBB2", "\uEBB3", "\uEBB4",
-            "\uEBB5"
-        };
 
         private IntPtr _hwnd;
-        private DispatcherTimer _timer;
-        private GlobalSystemMediaTransportControlsSessionManager _mediaManager;
-        private int _tickCount;
+        private DispatcherTimer _clockTimer;
+        private DispatcherTimer _batteryTimer;
+        private IntPtr _foregroundHook;
+        private IntPtr _titleChangeHook;
+        private NativeMethods.WinEventDelegate _foregroundDelegate;
+        private NativeMethods.WinEventDelegate _titleChangeDelegate;
         private bool _appBarRegistered;
         private MenuBarSettings _settings = MenuBarSettings.CreateDefault();
         private HardwareService.BatteryInfo _batteryInfo = new HardwareService.BatteryInfo();
         private HardwareService.NetworkInfo _networkInfo = new HardwareService.NetworkInfo();
-        private MediaState _mediaState = MediaState.Empty;
 
         public MainWindow()
         {
             InitializeComponent();
             _hwnd = WindowNative.GetWindowHandle(this);
+            _mediaService = new MediaService(DispatcherQueue);
             Closed += Window_Closed;
 
             LoadSettings(applyLayout: false);
             ConfigureWindow();
-            SetupTimer();
+            SetupTimers();
+            SetupForegroundHook();
+
             UpdateClock();
             UpdateActiveWindow();
-            UpdateHardware();
-            _ = InitMediaManagerAsync();
+            UpdateBattery();
+            UpdateNetwork();
+
+            _mediaService.StateChanged += OnMediaStateChanged;
+            _ = _mediaService.InitializeAsync();
+
+            Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged += OnNetworkStatusChanged;
         }
+
+        #region Window Configuration
 
         private void ConfigureWindow()
         {
@@ -99,7 +94,8 @@ namespace MenuBar
                 SystemBackdrop = new MicaBackdrop { Kind = MicaKind.Base };
             }
 
-            AppWindow appWindow = AppWindow.GetFromWindowId(Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd));
+            AppWindow appWindow = AppWindow.GetFromWindowId(
+                Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd));
             if (appWindow.Presenter is OverlappedPresenter presenter)
             {
                 presenter.IsMaximizable = false;
@@ -115,10 +111,7 @@ namespace MenuBar
             NativeMethods.SetWindowPos(
                 _hwnd,
                 IntPtr.Zero,
-                0,
-                0,
-                0,
-                0,
+                0, 0, 0, 0,
                 NativeMethods.SWP_NOMOVE |
                 NativeMethods.SWP_NOSIZE |
                 NativeMethods.SWP_NOZORDER |
@@ -169,48 +162,66 @@ namespace MenuBar
                 NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
         }
 
-        private void SetupTimer()
+        #endregion
+
+        #region Timers & Event Hooks
+
+        private void SetupTimers()
         {
-            _timer = new DispatcherTimer();
-            _timer.Interval = TimeSpan.FromMilliseconds(500);
-            _timer.Tick += Timer_Tick;
-            _timer.Start();
+            _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _clockTimer.Tick += (_, _) => UpdateClock();
+            _clockTimer.Start();
+
+            _batteryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _batteryTimer.Tick += (_, _) => UpdateBattery();
+            _batteryTimer.Start();
         }
 
-        private void Timer_Tick(object sender, object e)
+        private void SetupForegroundHook()
         {
-            _tickCount++;
+            _foregroundDelegate = OnForegroundEvent;
+            _foregroundHook = NativeMethods.SetWinEventHook(
+                NativeMethods.EVENT_SYSTEM_FOREGROUND,
+                NativeMethods.EVENT_SYSTEM_FOREGROUND,
+                IntPtr.Zero, _foregroundDelegate, 0, 0,
+                NativeMethods.WINEVENT_OUTOFCONTEXT);
+
+            _titleChangeDelegate = OnTitleChangeEvent;
+            _titleChangeHook = NativeMethods.SetWinEventHook(
+                NativeMethods.EVENT_OBJECT_NAMECHANGE,
+                NativeMethods.EVENT_OBJECT_NAMECHANGE,
+                IntPtr.Zero, _titleChangeDelegate, 0, 0,
+                NativeMethods.WINEVENT_OUTOFCONTEXT);
+        }
+
+        private void OnForegroundEvent(IntPtr hook, uint eventType, IntPtr hwnd,
+            int idObject, int idChild, uint threadId, uint time)
+        {
             UpdateActiveWindow();
-
-            if (_tickCount % 2 == 0)
-            {
-                UpdateClock();
-            }
-
-            if (_tickCount % 4 == 0)
-            {
-                UpdateMedia();
-            }
-
-            if (_tickCount % 20 == 0)
-            {
-                UpdateHardware();
-            }
         }
 
-        private async Task InitMediaManagerAsync()
+        private void OnTitleChangeEvent(IntPtr hook, uint eventType, IntPtr hwnd,
+            int idObject, int idChild, uint threadId, uint time)
         {
-            try
+            if (hwnd == NativeMethods.GetForegroundWindow())
             {
-                _mediaManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-                UpdateMedia();
-            }
-            catch
-            {
-                _mediaState = MediaState.Empty;
-                ApplyMediaState();
+                UpdateActiveWindow();
             }
         }
+
+        private void OnNetworkStatusChanged(object sender)
+        {
+            DispatcherQueue.TryEnqueue(UpdateNetwork);
+        }
+
+        private void OnMediaStateChanged(MediaService.MediaState state)
+        {
+            ApplyMediaState(state);
+        }
+
+        #endregion
+
+        #region Settings
 
         private void LoadSettings(bool applyLayout)
         {
@@ -222,8 +233,9 @@ namespace MenuBar
             {
                 RegisterOrUpdateAppBar(registerIfNeeded: false);
                 UpdateClock();
-                ApplyMediaState();
-                UpdateHardware();
+                ApplyMediaState(_mediaService?.CurrentState ?? MediaService.MediaState.Empty);
+                UpdateBattery();
+                UpdateNetwork();
             }
         }
 
@@ -240,8 +252,12 @@ namespace MenuBar
             ViewModel.IconFontSize = barHeight * 0.62;
             ViewModel.TextFontSize = barHeight * 0.44;
 
-            ApplyMediaState();
+            ApplyMediaState(_mediaService?.CurrentState ?? MediaService.MediaState.Empty);
         }
+
+        #endregion
+
+        #region Update Methods
 
         private void UpdateClock()
         {
@@ -284,110 +300,27 @@ namespace MenuBar
             ViewModel.ActiveWindowTitleTooltip = title;
         }
 
-        private async void UpdateMedia()
-        {
-            if (_mediaManager == null)
-            {
-                _mediaState = MediaState.Empty;
-                ApplyMediaState();
-                return;
-            }
-
-            GlobalSystemMediaTransportControlsSession session = _mediaManager.GetCurrentSession();
-            if (session == null)
-            {
-                _mediaState = MediaState.Empty;
-                ApplyMediaState();
-                return;
-            }
-
-            try
-            {
-                var props = await session.TryGetMediaPropertiesAsync();
-                var playback = session.GetPlaybackInfo();
-                var state = new MediaState
-                {
-                    Title = props?.Title ?? string.Empty,
-                    Artist = props?.Artist ?? string.Empty,
-                    Playing = playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
-                };
-                
-                if (props?.Thumbnail != null)
-                {
-                    try
-                    {
-                        var stream = await props.Thumbnail.OpenReadAsync();
-                        if (stream != null)
-                        {
-                            var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
-                            await bitmap.SetSourceAsync(stream);
-                            state.AlbumCover = bitmap;
-                        }
-                    }
-                    catch
-                    {
-                    }
-                }
-                
-                _mediaState = state;
-            }
-            catch
-            {
-                _mediaState = MediaState.Empty;
-            }
-
-            ApplyMediaState();
-        }
-
-        private void ApplyMediaState()
-        {
-            if (_settings.ShowMedia && _mediaState.HasContent)
-            {
-                string display = BuildMediaDisplay(_mediaState);
-                ViewModel.MediaText = display;
-                ViewModel.MediaTooltip = display;
-                ViewModel.MediaIndicatorBrush = _mediaState.Playing ? _mediaPlayingBrush : _mediaPausedBrush;
-                ViewModel.MediaVisibility = Visibility.Visible;
-                
-                ViewModel.MediaTitle = _mediaState.Title;
-                ViewModel.MediaArtist = _mediaState.Artist;
-                ViewModel.MediaAlbumCover = _mediaState.AlbumCover;
-                ViewModel.MediaPlayPauseSymbol = _mediaState.Playing ? Symbol.Pause : Symbol.Play;
-            }
-            else
-            {
-                ViewModel.MediaText = "Nothing playing";
-                ViewModel.MediaTooltip = string.Empty;
-                ViewModel.MediaIndicatorBrush = _mediaInactiveBrush;
-                ViewModel.MediaVisibility = Visibility.Collapsed;
-                
-                ViewModel.MediaTitle = "Nothing playing";
-                ViewModel.MediaArtist = string.Empty;
-                ViewModel.MediaAlbumCover = null;
-                ViewModel.MediaPlayPauseSymbol = Symbol.Play;
-            }
-        }
-
-        private void UpdateHardware()
+        private void UpdateBattery()
         {
             _batteryInfo = _hwService.GetBatteryInfo();
             if (_batteryInfo.HasBattery)
             {
                 ViewModel.BatteryText = $"{_batteryInfo.Percent}%";
                 ViewModel.BatteryIcon = GetBatteryFillGlyph(_batteryInfo.Percent);
-                var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging);
+                var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn);
                 BatteryFillGlyphText.Foreground = brush;
-                
-                // Hide outline if the fill is white to avoid visual clashing
-                BatteryOutlineGlyphText.Visibility = (brush == _batteryDefaultBrush) 
-                    ? Visibility.Collapsed 
+
+                BatteryOutlineGlyphText.Visibility = (brush == _batteryDefaultBrush)
+                    ? Visibility.Collapsed
                     : Visibility.Visible;
-                
-                BatteryBoltPath.Visibility = _batteryInfo.Charging ? Visibility.Visible : Visibility.Collapsed;
+
+                BatteryBoltPath.Visibility = _batteryInfo.Charging
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
 
                 string status = _batteryInfo.Charging
                     ? "Charging"
-                    : (_batteryInfo.PluggedIn ? "Plugged in" : "On battery");
+                    : (_batteryInfo.PluggedIn ? "Plugged in, fully charged" : "On battery");
                 ViewModel.BatteryTooltip = $"Battery: {_batteryInfo.Percent}%\n{status}";
             }
             else
@@ -399,7 +332,10 @@ namespace MenuBar
                 BatteryOutlineGlyphText.Visibility = Visibility.Collapsed;
                 BatteryBoltPath.Visibility = Visibility.Collapsed;
             }
+        }
 
+        private void UpdateNetwork()
+        {
             _networkInfo = _hwService.GetNetworkInfo();
             if (!_networkInfo.Connected)
             {
@@ -419,47 +355,44 @@ namespace MenuBar
             }
         }
 
-        private static Visibility ToVisibility(bool value)
+        private void ApplyMediaState(MediaService.MediaState state)
         {
-            return value ? Visibility.Visible : Visibility.Collapsed;
+            if (_settings.ShowMedia && state.HasContent)
+            {
+                string display = BuildMediaDisplay(state);
+                ViewModel.MediaText = display;
+                ViewModel.MediaTooltip = display;
+                ViewModel.MediaIndicatorBrush = state.Playing ? _mediaPlayingBrush : _mediaPausedBrush;
+                ViewModel.MediaVisibility = Visibility.Visible;
+
+                ViewModel.MediaTitle = state.Title;
+                ViewModel.MediaArtist = state.Artist;
+                ViewModel.MediaAlbumCover = state.AlbumCover;
+                ViewModel.MediaPlayPauseSymbol = state.Playing ? Symbol.Pause : Symbol.Play;
+            }
+            else
+            {
+                ViewModel.MediaText = "Nothing playing";
+                ViewModel.MediaTooltip = string.Empty;
+                ViewModel.MediaIndicatorBrush = _mediaInactiveBrush;
+                ViewModel.MediaVisibility = Visibility.Collapsed;
+
+                ViewModel.MediaTitle = "Nothing playing";
+                ViewModel.MediaArtist = string.Empty;
+                ViewModel.MediaAlbumCover = null;
+                ViewModel.MediaPlayPauseSymbol = Symbol.Play;
+            }
         }
 
-        private static string BuildMediaDisplay(MediaState mediaState)
-        {
-            if (!string.IsNullOrWhiteSpace(mediaState.Title) && !string.IsNullOrWhiteSpace(mediaState.Artist))
-            {
-                return $"{mediaState.Title} — {mediaState.Artist}";
-            }
+        #endregion
 
-            if (!string.IsNullOrWhiteSpace(mediaState.Title))
-            {
-                return mediaState.Title;
-            }
-
-            return mediaState.Artist;
-        }
-
-        private static string FormatRemainingTime(int? secondsRemaining)
-        {
-            if (!secondsRemaining.HasValue || secondsRemaining.Value <= 0)
-            {
-                return string.Empty;
-            }
-
-            TimeSpan span = TimeSpan.FromSeconds(secondsRemaining.Value);
-            if (span.Hours > 0)
-            {
-                return $"{span.Hours}h {span.Minutes}m remaining";
-            }
-
-            return $"{Math.Max(1, span.Minutes)}m remaining";
-        }
+        #region Flyout Helpers
 
         private void UpdateBatteryFlyout()
         {
             if (!_batteryInfo.HasBattery)
             {
-                BatteryMenuPrimaryItem.Text = "AC power — no battery detected";
+                BatteryMenuPrimaryItem.Text = "AC power \u2014 no battery detected";
                 BatteryMenuSecondaryItem.Visibility = Visibility.Collapsed;
                 BatteryMenuTimeItem.Visibility = Visibility.Collapsed;
                 return;
@@ -468,7 +401,7 @@ namespace MenuBar
             BatteryMenuPrimaryItem.Text = $"{_batteryInfo.Percent}%";
             BatteryMenuSecondaryItem.Text = _batteryInfo.Charging
                 ? "Charging..."
-                : (_batteryInfo.PluggedIn ? "Plugged in, not charging" : "On battery power");
+                : (_batteryInfo.PluggedIn ? "Plugged in, fully charged" : "On battery power");
             BatteryMenuSecondaryItem.Visibility = Visibility.Visible;
 
             string remaining = FormatRemainingTime(_batteryInfo.SecondsRemaining);
@@ -498,7 +431,13 @@ namespace MenuBar
             {
                 string ssid = string.IsNullOrWhiteSpace(_networkInfo.Ssid) ? "Wi-Fi" : _networkInfo.Ssid;
                 NetworkMenuPrimaryItem.Text = ssid;
-                NetworkMenuSecondaryItem.Text = BuildWifiDetailText();
+                NetworkMenuSecondaryItem.Text = _networkInfo.SignalLevel switch
+                {
+                    1 => "Wi-Fi  \u00b7  Weak",
+                    2 => "Wi-Fi  \u00b7  Fair",
+                    3 => "Wi-Fi  \u00b7  Strong",
+                    _ => "Wi-Fi"
+                };
             }
             else
             {
@@ -511,45 +450,9 @@ namespace MenuBar
             SetSpeedMenuItem(NetworkMenuUpItem, "Link speed (\u2191)", _networkInfo.TransmitRateMbps, _networkInfo.ReceiveRateMbps);
         }
 
-        private string BuildWifiDetailText()
-        {
-            return _networkInfo.SignalLevel switch
-            {
-                1 => "Wi-Fi  ·  Weak",
-                2 => "Wi-Fi  ·  Fair",
-                3 => "Wi-Fi  ·  Strong",
-                _ => "Wi-Fi"
-            };
-        }
+        #endregion
 
-        private static void SetSpeedMenuItem(MenuFlyoutItem item, string label, int? speed, int? compareWith = null)
-        {
-            if (!speed.HasValue || (compareWith.HasValue && compareWith.Value == speed.Value && item.Name == nameof(NetworkMenuUpItem)))
-            {
-                item.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            item.Text = $"{label}: {speed.Value} Mbps";
-            item.Visibility = Visibility.Visible;
-        }
-
-        private static void ToggleAttachedFlyout(FrameworkElement element)
-        {
-            FlyoutBase flyout = FlyoutBase.GetAttachedFlyout(element);
-            if (flyout == null)
-            {
-                return;
-            }
-
-            if (flyout.IsOpen)
-            {
-                flyout.Hide();
-                return;
-            }
-
-            FlyoutBase.ShowAttachedFlyout(element);
-        }
+        #region Event Handlers
 
         private void LogoHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
@@ -621,14 +524,17 @@ namespace MenuBar
 
         private void MediaPrevious_Click(object sender, RoutedEventArgs e)
         {
-            SendKey(NativeMethods.VK_MEDIA_PREV_TRACK);
+            _ = _mediaService.SendPreviousAsync();
         }
 
         private void MediaPlayPause_Click(object sender, RoutedEventArgs e)
         {
-            SendKey(NativeMethods.VK_MEDIA_PLAY_PAUSE);
-            _mediaState.Playing = !_mediaState.Playing;
-            ApplyMediaState();
+            _ = _mediaService.SendPlayPauseAsync();
+        }
+
+        private void MediaNext_Click(object sender, RoutedEventArgs e)
+        {
+            _ = _mediaService.SendNextAsync();
         }
 
         private void Host_PointerEntered(object sender, PointerRoutedEventArgs e)
@@ -663,36 +569,84 @@ namespace MenuBar
             }
         }
 
+        #endregion
+
+        #region Utilities
+
+        private static Visibility ToVisibility(bool value)
+        {
+            return value ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static string BuildMediaDisplay(MediaService.MediaState state)
+        {
+            if (!string.IsNullOrWhiteSpace(state.Title) && !string.IsNullOrWhiteSpace(state.Artist))
+            {
+                return $"{state.Title} \u2014 {state.Artist}";
+            }
+
+            return !string.IsNullOrWhiteSpace(state.Title) ? state.Title : state.Artist;
+        }
+
+        private static string FormatRemainingTime(int? secondsRemaining)
+        {
+            if (!secondsRemaining.HasValue || secondsRemaining.Value <= 0)
+            {
+                return string.Empty;
+            }
+
+            TimeSpan span = TimeSpan.FromSeconds(secondsRemaining.Value);
+            if (span.Hours > 0)
+            {
+                return $"{span.Hours}h {span.Minutes}m remaining";
+            }
+
+            return $"{Math.Max(1, span.Minutes)}m remaining";
+        }
+
         private static string GetBatteryFillGlyph(int percent)
         {
             int bucket = Math.Clamp((int)Math.Round(percent / 10.0), 0, 10);
             return MobileBatteryGlyphs[bucket];
         }
 
-        private SolidColorBrush GetBatteryFillBrush(int percent, bool charging)
+        private SolidColorBrush GetBatteryFillBrush(int percent, bool charging, bool pluggedIn)
         {
-            if (charging)
+            if (charging || pluggedIn)
             {
                 return _batteryChargingBrush;
             }
 
-            if (percent <= 20)
+            return percent <= 20 ? _batterySaverBrush : _batteryDefaultBrush;
+        }
+
+        private static void SetSpeedMenuItem(MenuFlyoutItem item, string label, int? speed, int? compareWith = null)
+        {
+            if (!speed.HasValue || (compareWith.HasValue && compareWith.Value == speed.Value))
             {
-                return _batterySaverBrush;
+                item.Visibility = Visibility.Collapsed;
+                return;
             }
 
-            return _batteryDefaultBrush;
+            item.Text = $"{label}: {speed.Value} Mbps";
+            item.Visibility = Visibility.Visible;
         }
 
-        private void MediaNext_Click(object sender, RoutedEventArgs e)
+        private static void ToggleAttachedFlyout(FrameworkElement element)
         {
-            SendKey(NativeMethods.VK_MEDIA_NEXT_TRACK);
-        }
+            FlyoutBase flyout = FlyoutBase.GetAttachedFlyout(element);
+            if (flyout == null)
+            {
+                return;
+            }
 
-        private static void SendKey(byte virtualKey)
-        {
-            NativeMethods.keybd_event(virtualKey, 0, 0, 0);
-            NativeMethods.keybd_event(virtualKey, 0, NativeMethods.KEYEVENTF_KEYUP, 0);
+            if (flyout.IsOpen)
+            {
+                flyout.Hide();
+                return;
+            }
+
+            FlyoutBase.ShowAttachedFlyout(element);
         }
 
         private static void SendKeyChord(byte firstKey, byte secondKey)
@@ -762,13 +716,28 @@ namespace MenuBar
             App.Current.Exit();
         }
 
+        #endregion
+
+        #region Cleanup
+
         private void Window_Closed(object sender, WindowEventArgs args)
         {
-            if (_timer != null)
+            _clockTimer?.Stop();
+            _batteryTimer?.Stop();
+
+            if (_foregroundHook != IntPtr.Zero)
             {
-                _timer.Stop();
-                _timer.Tick -= Timer_Tick;
+                NativeMethods.UnhookWinEvent(_foregroundHook);
             }
+
+            if (_titleChangeHook != IntPtr.Zero)
+            {
+                NativeMethods.UnhookWinEvent(_titleChangeHook);
+            }
+
+            _mediaService?.Dispose();
+
+            Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged -= OnNetworkStatusChanged;
 
             if (_appBarRegistered)
             {
@@ -781,5 +750,7 @@ namespace MenuBar
                 _appBarRegistered = false;
             }
         }
+
+        #endregion
     }
 }

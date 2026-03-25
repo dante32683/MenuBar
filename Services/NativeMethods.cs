@@ -6,13 +6,14 @@ namespace MenuBar.Services
 {
     public static class NativeMethods
     {
+        // AppBar
         public const int ABM_NEW = 0x00000000;
         public const int ABM_REMOVE = 0x00000001;
         public const int ABM_QUERYPOS = 0x00000002;
         public const int ABM_SETPOS = 0x00000003;
-        
         public const int ABE_TOP = 1;
 
+        // Window positioning
         public const int HWND_TOPMOST = -1;
         public const int SWP_NOSIZE = 0x0001;
         public const int SWP_NOMOVE = 0x0002;
@@ -22,15 +23,34 @@ namespace MenuBar.Services
         public const int SWP_FRAMECHANGED = 0x0020;
         public const int SWP_NOOWNERZORDER = 0x0200;
 
+        // Window styles
         public const int GWL_EXSTYLE = -20;
         public const int WS_EX_TOOLWINDOW = 0x00000080;
         public const int WS_EX_APPWINDOW = 0x00040000;
+
+        // Keyboard
         public const int KEYEVENTF_KEYUP = 0x0002;
         public const byte VK_LWIN = 0x5B;
         public const byte VK_N = 0x4E;
-        public const byte VK_MEDIA_PLAY_PAUSE = 0xB3;
-        public const byte VK_MEDIA_NEXT_TRACK = 0xB0;
-        public const byte VK_MEDIA_PREV_TRACK = 0xB1;
+
+        // Screen metrics
+        public const int SM_XVIRTUALSCREEN = 76;
+        public const int SM_YVIRTUALSCREEN = 77;
+        public const int SM_CXVIRTUALSCREEN = 78;
+
+        // WinEvent hooks
+        public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+        public const uint EVENT_OBJECT_NAMECHANGE = 0x800C;
+        public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+
+        public delegate void WinEventDelegate(
+            IntPtr hWinEventHook,
+            uint eventType,
+            IntPtr hwnd,
+            int idObject,
+            int idChild,
+            uint dwEventThread,
+            uint dwmsEventTime);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT
@@ -81,7 +101,7 @@ namespace MenuBar.Services
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
-        
+
         [DllImport("user32.dll")]
         public static extern int GetSystemMetrics(int nIndex);
 
@@ -92,8 +112,18 @@ namespace MenuBar.Services
         [DllImport("user32.dll")]
         public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
-        public const int SM_XVIRTUALSCREEN = 76;
-        public const int SM_YVIRTUALSCREEN = 77;
-        public const int SM_CXVIRTUALSCREEN = 78;
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetWinEventHook(
+            uint eventMin,
+            uint eventMax,
+            IntPtr hmodWinEventProc,
+            WinEventDelegate lpfnWinEventProc,
+            uint idProcess,
+            uint idThread,
+            uint dwFlags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
     }
 }
