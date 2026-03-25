@@ -446,19 +446,30 @@ namespace MenuBar
             _batteryInfo = _hwService.GetBatteryInfo();
             if (_batteryInfo.HasBattery)
             {
-                ViewModel.BatteryText = $"{_batteryInfo.Percent}%";
-                ViewModel.BatteryIcon = GetBatteryFillGlyph(_batteryInfo.Percent);
-                var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn);
-                BatteryFillGlyphText.Foreground = brush;
+                if (_batteryInfo.IsCalculating)
+                {
+                    ViewModel.BatteryText = "--%";
+                    ViewModel.BatteryIcon = MobileBatteryGlyphs[5];
+                    BatteryFillGlyphText.Foreground = _batteryDefaultBrush;
+                    BatteryOutlineGlyphText.Visibility = Visibility.Collapsed;
+                    ViewModel.BatteryTooltip = "Battery: Calculating...";
+                }
+                else
+                {
+                    ViewModel.BatteryText = $"{_batteryInfo.Percent}%";
+                    ViewModel.BatteryIcon = GetBatteryFillGlyph(_batteryInfo.Percent);
+                    var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn);
+                    BatteryFillGlyphText.Foreground = brush;
 
-                BatteryOutlineGlyphText.Visibility = (brush == _batteryDefaultBrush)
-                    ? Visibility.Collapsed
-                    : Visibility.Visible;
+                    BatteryOutlineGlyphText.Visibility = (brush == _batteryDefaultBrush)
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
 
-                string status = _batteryInfo.Charging
-                    ? "Charging"
-                    : (_batteryInfo.PluggedIn ? "Plugged in, fully charged" : "On battery");
-                ViewModel.BatteryTooltip = $"Battery: {_batteryInfo.Percent}%\n{status}";
+                    string status = _batteryInfo.Charging
+                        ? "Charging"
+                        : (_batteryInfo.PluggedIn ? "Plugged in, fully charged" : "On battery");
+                    ViewModel.BatteryTooltip = $"Battery: {_batteryInfo.Percent}%\n{status}";
+                }
             }
             else
             {
@@ -482,12 +493,16 @@ namespace MenuBar
             {
                 ViewModel.NetworkIcon = "\uE701";
                 string ssid = string.IsNullOrWhiteSpace(_networkInfo.Ssid) ? "Wi-Fi" : _networkInfo.Ssid;
-                ViewModel.NetworkTooltip = $"Network: {ssid}";
+                ViewModel.NetworkTooltip = _networkInfo.IsLimited
+                    ? $"Network: {ssid} (Limited)"
+                    : $"Network: {ssid}";
             }
             else
             {
                 ViewModel.NetworkIcon = "\uE839";
-                ViewModel.NetworkTooltip = "Network: Ethernet";
+                ViewModel.NetworkTooltip = _networkInfo.IsLimited
+                    ? "Network: Ethernet (Limited)"
+                    : "Network: Ethernet";
             }
         }
 
@@ -538,6 +553,16 @@ namespace MenuBar
                 return;
             }
 
+            if (_batteryInfo.IsCalculating)
+            {
+                BatteryFlyoutPercent.Text = "--%";
+                BatteryFlyoutStatus.Text = "Calculating...";
+                BatteryFlyoutIcon.Text = MobileBatteryGlyphs[5];
+                BatteryFlyoutIcon.Foreground = _batteryDefaultBrush;
+                BatteryFlyoutTime.Visibility = Visibility.Collapsed;
+                return;
+            }
+
             BatteryFlyoutPercent.Text = $"{_batteryInfo.Percent}%";
             BatteryFlyoutStatus.Text = _batteryInfo.Charging
                 ? "Charging"
@@ -575,19 +600,21 @@ namespace MenuBar
                 NetworkFlyoutIcon.Text = "\uE701";
                 string ssid = string.IsNullOrWhiteSpace(_networkInfo.Ssid) ? "Wi-Fi" : _networkInfo.Ssid;
                 NetworkFlyoutName.Text = ssid;
-                NetworkFlyoutStatus.Text = _networkInfo.SignalLevel switch
-                {
-                    1 => "Wi-Fi  \u00b7  Weak signal",
-                    2 => "Wi-Fi  \u00b7  Fair signal",
-                    3 => "Wi-Fi  \u00b7  Strong signal",
-                    _ => "Wi-Fi"
-                };
+                NetworkFlyoutStatus.Text = _networkInfo.IsLimited
+                    ? "Limited connectivity"
+                    : _networkInfo.SignalLevel switch
+                    {
+                        1 => "Wi-Fi  \u00b7  Weak signal",
+                        2 => "Wi-Fi  \u00b7  Fair signal",
+                        3 => "Wi-Fi  \u00b7  Strong signal",
+                        _ => "Wi-Fi"
+                    };
             }
             else
             {
                 NetworkFlyoutIcon.Text = "\uE839";
                 NetworkFlyoutName.Text = "Ethernet";
-                NetworkFlyoutStatus.Text = "Connected";
+                NetworkFlyoutStatus.Text = _networkInfo.IsLimited ? "Limited connectivity" : "Connected";
             }
 
             if (_networkInfo.ReceiveRateMbps.HasValue)
@@ -623,6 +650,7 @@ namespace MenuBar
 
         private void BatteryHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
+            UpdateBattery();
             UpdateBatteryFlyout();
             ToggleAttachedFlyout((FrameworkElement)sender);
         }

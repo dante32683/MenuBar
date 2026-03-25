@@ -187,6 +187,7 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _iconFontSize, value);
         }
 
+
         private double _textFontSize = 11;
         public double TextFontSize
         {

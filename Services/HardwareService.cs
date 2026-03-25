@@ -12,6 +12,7 @@ namespace MenuBar.Services
         {
             public bool HasBattery { get; set; }
             public int Percent { get; set; }
+            public bool IsCalculating { get; set; }
             public bool Charging { get; set; }
             public bool PluggedIn { get; set; }
             public int? SecondsRemaining { get; set; }
@@ -20,6 +21,7 @@ namespace MenuBar.Services
         public class NetworkInfo
         {
             public bool Connected { get; set; }
+            public bool IsLimited { get; set; }
             public bool IsWifi { get; set; }
             public string Ssid { get; set; }
             public int SignalLevel { get; set; }
@@ -44,7 +46,8 @@ namespace MenuBar.Services
                     }
 
                     info.PluggedIn = status.ACLineStatus == 1;
-                    info.Percent = status.BatteryLifePercent == byte.MaxValue ? 0 : status.BatteryLifePercent;
+                    info.IsCalculating = status.BatteryLifePercent == byte.MaxValue;
+                    info.Percent = info.IsCalculating ? 0 : status.BatteryLifePercent;
                     var batteryReport = Battery.AggregateBattery.GetReport();
                     // Lenovo conservation mode keeps Status=Charging but ChargeRateInMilliwatts=0.
                     // Use actual current flow as ground truth when available; fall back to status flag otherwise.
@@ -77,12 +80,13 @@ namespace MenuBar.Services
                 }
 
                 var connectivity = profile.GetNetworkConnectivityLevel();
-                if (connectivity < NetworkConnectivityLevel.InternetAccess)
+                if (connectivity == NetworkConnectivityLevel.None)
                 {
                     return info;
                 }
 
                 info.Connected = true;
+                info.IsLimited = connectivity < NetworkConnectivityLevel.InternetAccess;
 
                 if (profile.IsWlanConnectionProfile)
                 {

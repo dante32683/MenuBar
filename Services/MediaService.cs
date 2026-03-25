@@ -41,13 +41,32 @@ namespace MenuBar.Services
             {
                 _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
                 _manager.CurrentSessionChanged += OnCurrentSessionChanged;
-                AttachSession(_manager.GetCurrentSession());
-                await RefreshAsync();
+                AttachSession(FindBestSession(_manager));
+                _dispatcher.TryEnqueue(() => _ = RefreshAsync());
             }
             catch
             {
-                CurrentState = MediaState.Empty;
-                StateChanged?.Invoke(CurrentState);
+                _dispatcher.TryEnqueue(() =>
+                {
+                    CurrentState = MediaState.Empty;
+                    StateChanged?.Invoke(CurrentState);
+                });
+            }
+        }
+
+        private static GlobalSystemMediaTransportControlsSession FindBestSession(
+            GlobalSystemMediaTransportControlsSessionManager manager)
+        {
+            try
+            {
+                var playing = manager.GetSessions()
+                    .FirstOrDefault(s => s.GetPlaybackInfo()?.PlaybackStatus ==
+                        GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
+                return playing ?? manager.GetCurrentSession();
+            }
+            catch
+            {
+                return manager.GetCurrentSession();
             }
         }
 
