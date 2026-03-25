@@ -31,7 +31,7 @@
             </MenuFlyout>
         </Grid.ContextFlyout>
 
-        <Border x:Name="BackgroundBorder" Background="#B01C222A">
+        <Border x:Name="BackgroundBorder">
             <Grid x:Name="MainContentGrid" Padding="12,0" VerticalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -184,7 +184,7 @@
                             <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}"
                                        FontFamily="Segoe UI Variable"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
-                                       MaxWidth="310"
+                                       MaxWidth="210"
                                        TextTrimming="CharacterEllipsis"
                                        Foreground="White"
                                        VerticalAlignment="Center" />

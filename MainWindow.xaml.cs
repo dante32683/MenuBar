@@ -59,6 +59,7 @@ namespace MenuBar
         private NativeMethods.WinEventDelegate _titleChangeDelegate;
         private bool _appBarRegistered;
         private MenuBarSettings _settings = MenuBarSettings.CreateDefault();
+        private readonly Windows.UI.ViewManagement.UISettings _uiSettings = new();
         private HardwareService.BatteryInfo _batteryInfo = new HardwareService.BatteryInfo();
         private HardwareService.NetworkInfo _networkInfo = new HardwareService.NetworkInfo();
 
@@ -83,13 +84,18 @@ namespace MenuBar
             _ = _mediaService.InitializeAsync();
 
             Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged += OnNetworkStatusChanged;
+            _uiSettings.ColorValuesChanged += OnAccentColorChanged;
         }
 
         #region Window Configuration
 
         private void ConfigureWindow()
         {
-            if (MicaController.IsSupported())
+            if (DesktopAcrylicController.IsSupported())
+            {
+                SystemBackdrop = new DesktopAcrylicBackdrop();
+            }
+            else if (MicaController.IsSupported())
             {
                 SystemBackdrop = new MicaBackdrop { Kind = MicaKind.Base };
             }
@@ -214,6 +220,11 @@ namespace MenuBar
             DispatcherQueue.TryEnqueue(UpdateNetwork);
         }
 
+        private void OnAccentColorChanged(Windows.UI.ViewManagement.UISettings sender, object args)
+        {
+            DispatcherQueue.TryEnqueue(ApplyBackgroundColor);
+        }
+
         private void OnMediaStateChanged(MediaService.MediaState state)
         {
             ApplyMediaState(state);
@@ -239,6 +250,21 @@ namespace MenuBar
             }
         }
 
+        private void ApplyBackgroundColor()
+        {
+            Windows.UI.Color c;
+            if (_settings.UseAccentColor)
+            {
+                var accent = _uiSettings.GetColorValue(Windows.UI.ViewManagement.UIColorType.AccentDark2);
+                c = Microsoft.UI.ColorHelper.FromArgb(0xB0, accent.R, accent.G, accent.B);
+            }
+            else
+            {
+                c = Microsoft.UI.ColorHelper.FromArgb(0xB0, 0x1C, 0x22, 0x2A);
+            }
+            BackgroundBorder.Background = new SolidColorBrush(c);
+        }
+
         private void ApplySettings()
         {
             ViewModel.LogoVisibility = ToVisibility(_settings.ShowWindowsLogo);
@@ -253,6 +279,7 @@ namespace MenuBar
             ViewModel.TextFontSize = barHeight * 0.44;
 
             ApplyMediaState(_mediaService?.CurrentState ?? MediaService.MediaState.Empty);
+            ApplyBackgroundColor();
         }
 
         #endregion
@@ -738,6 +765,7 @@ namespace MenuBar
             _mediaService?.Dispose();
 
             Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged -= OnNetworkStatusChanged;
+            _uiSettings.ColorValuesChanged -= OnAccentColorChanged;
 
             if (_appBarRegistered)
             {

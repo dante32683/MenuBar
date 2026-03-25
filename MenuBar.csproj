@@ -16,6 +16,7 @@
     <SelfContained>true</SelfContained>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishTrimmed>false</PublishTrimmed>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,4 +30,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="RemoveLanguageFolders" AfterTargets="Publish">
+    <Exec Command="powershell -NoProfile -Command &quot;Get-ChildItem -Path '$(PublishDir)' -Directory | Where-Object { $_.Name -ne 'en-us' } | Remove-Item -Recurse -Force&quot;" />
+  </Target>
+
 </Project>
