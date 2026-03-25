@@ -60,53 +60,59 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0" VerticalAlignment="Stretch">
-                    <Border x:Name="LogoHost"
-                            Visibility="{x:Bind ViewModel.LogoVisibility, Mode=OneWay}"
-                            Background="Transparent"
-                            CornerRadius="6"
-                            Padding="8,0"
-                            VerticalAlignment="Stretch"
-                            PointerEntered="Host_PointerEntered"
-                            PointerExited="Host_PointerExited"
-                            PointerPressed="Host_PointerPressed"
-                            PointerReleased="Host_PointerReleased"
-                            Tapped="LogoHost_Tapped">
-                        <FlyoutBase.AttachedFlyout>
-                            <!-- Same backdrop rule applies to all popups in this file. -->
-                            <MenuFlyout ShouldConstrainToRootBounds="False">
-                                <MenuFlyout.SystemBackdrop>
-                                    <media:DesktopAcrylicBackdrop />
-                                </MenuFlyout.SystemBackdrop>
-                                <MenuFlyout.MenuFlyoutPresenterStyle>
-                                    <Style TargetType="MenuFlyoutPresenter">
-                                        <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
-                                    </Style>
-                                </MenuFlyout.MenuFlyoutPresenterStyle>
-                                <MenuFlyoutItem Text="Settings" Click="OpenWindowsSettings_Click" />
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutItem Text="Sleep" Click="SleepSystem_Click" />
-                                <MenuFlyoutItem Text="Restart" Click="RestartSystem_Click" />
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutItem Text="Shut down" Click="ShutdownSystem_Click" />
-                            </MenuFlyout>
-                        </FlyoutBase.AttachedFlyout>
-                        <Grid Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                              Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                              VerticalAlignment="Center">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Rectangle Fill="White" Grid.Row="0" Grid.Column="0" Margin="0,0,1,1" />
-                            <Rectangle Fill="White" Grid.Row="0" Grid.Column="1" Margin="1,0,0,1" />
-                            <Rectangle Fill="White" Grid.Row="1" Grid.Column="0" Margin="0,1,1,0" />
-                            <Rectangle Fill="White" Grid.Row="1" Grid.Column="1" Margin="1,1,0,0" />
-                        </Grid>
-                    </Border>
+                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
+                    <Grid Visibility="{x:Bind ViewModel.LogoVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          VerticalAlignment="Stretch"
+                          Margin="0,-3,0,0"
+                          PointerEntered="Host_PointerEntered"
+                          PointerExited="Host_PointerExited"
+                          PointerPressed="Host_PointerPressed"
+                          PointerReleased="Host_PointerReleased"
+                          Tapped="LogoHost_Tapped">
+                        <Border x:Name="LogoHost"
+                                Background="Transparent"
+                                CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
+                                Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
+                                Margin="0,3,0,0"
+                                VerticalAlignment="Stretch">
+                            <FlyoutBase.AttachedFlyout>
+                                <!-- Same backdrop rule applies to all popups in this file. -->
+                                <MenuFlyout ShouldConstrainToRootBounds="False">
+                                    <MenuFlyout.SystemBackdrop>
+                                        <media:DesktopAcrylicBackdrop />
+                                    </MenuFlyout.SystemBackdrop>
+                                    <MenuFlyout.MenuFlyoutPresenterStyle>
+                                        <Style TargetType="MenuFlyoutPresenter">
+                                            <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
+                                        </Style>
+                                    </MenuFlyout.MenuFlyoutPresenterStyle>
+                                    <MenuFlyoutItem Text="Settings" Click="OpenWindowsSettings_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Sleep" Click="SleepSystem_Click" />
+                                    <MenuFlyoutItem Text="Restart" Click="RestartSystem_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Shut down" Click="ShutdownSystem_Click" />
+                                </MenuFlyout>
+                            </FlyoutBase.AttachedFlyout>
+                            <Grid Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                  Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                  VerticalAlignment="Center">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Rectangle Fill="White" Grid.Row="0" Grid.Column="0" Margin="0,0,1,1" />
+                                <Rectangle Fill="White" Grid.Row="0" Grid.Column="1" Margin="1,0,0,1" />
+                                <Rectangle Fill="White" Grid.Row="1" Grid.Column="0" Margin="0,1,1,0" />
+                                <Rectangle Fill="White" Grid.Row="1" Grid.Column="1" Margin="1,1,0,0" />
+                            </Grid>
+                        </Border>
+                    </Grid>
 
                     <Image Source="{x:Bind ViewModel.ActiveWindowIcon, Mode=OneWay}"
                            Visibility="{x:Bind ViewModel.ActiveWindowIconVisibility, Mode=OneWay}"
@@ -134,17 +140,22 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Stretch">
+                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
+                    <Grid Visibility="{x:Bind ViewModel.MediaVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          VerticalAlignment="Stretch"
+                          Margin="0,-3,0,0"
+                          PointerEntered="Host_PointerEntered"
+                          PointerExited="Host_PointerExited"
+                          PointerPressed="Host_PointerPressed"
+                          PointerReleased="Host_PointerReleased"
+                          Tapped="MediaHost_Tapped">
                     <Border x:Name="MediaHost"
-                            Visibility="{x:Bind ViewModel.MediaVisibility, Mode=OneWay}"
                             Background="Transparent"
-                            CornerRadius="6"
-                            Padding="8,0"
-                            VerticalAlignment="Stretch"
-                            PointerEntered="Host_PointerEntered"
-                            PointerExited="Host_PointerExited"
-                            PointerPressed="Host_PointerPressed"
-                            PointerReleased="Host_PointerReleased"
-                            Tapped="MediaHost_Tapped">
+                            CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
+                            Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
+                            Margin="0,3,0,0"
+                            VerticalAlignment="Stretch">
                         <FlyoutBase.AttachedFlyout>
                             <!-- Same backdrop rule applies to all popups in this file. -->
                             <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
@@ -226,18 +237,24 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+                    </Grid>
 
+                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
+                    <Grid Visibility="{x:Bind ViewModel.NetworkVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          VerticalAlignment="Stretch"
+                          Margin="0,-3,0,0"
+                          PointerEntered="Host_PointerEntered"
+                          PointerExited="Host_PointerExited"
+                          PointerPressed="Host_PointerPressed"
+                          PointerReleased="Host_PointerReleased"
+                          Tapped="NetworkHost_Tapped">
                     <Border x:Name="NetworkHost"
-                            Visibility="{x:Bind ViewModel.NetworkVisibility, Mode=OneWay}"
                             Background="Transparent"
-                            CornerRadius="6"
-                            Padding="8,0"
-                            VerticalAlignment="Stretch"
-                            PointerEntered="Host_PointerEntered"
-                            PointerExited="Host_PointerExited"
-                            PointerPressed="Host_PointerPressed"
-                            PointerReleased="Host_PointerReleased"
-                            Tapped="NetworkHost_Tapped">
+                            CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
+                            Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
+                            Margin="0,3,0,0"
+                            VerticalAlignment="Stretch">
                         <FlyoutBase.AttachedFlyout>
                             <!-- Same backdrop rule applies to all popups in this file. -->
                             <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
@@ -304,18 +321,24 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+                    </Grid>
 
+                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
+                    <Grid Visibility="{x:Bind ViewModel.BatteryVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          VerticalAlignment="Stretch"
+                          Margin="0,-3,0,0"
+                          PointerEntered="Host_PointerEntered"
+                          PointerExited="Host_PointerExited"
+                          PointerPressed="Host_PointerPressed"
+                          PointerReleased="Host_PointerReleased"
+                          Tapped="BatteryHost_Tapped">
                     <Border x:Name="BatteryHost"
-                            Visibility="{x:Bind ViewModel.BatteryVisibility, Mode=OneWay}"
                             Background="Transparent"
-                            CornerRadius="6"
-                            Padding="8,0"
-                            VerticalAlignment="Stretch"
-                            PointerEntered="Host_PointerEntered"
-                            PointerExited="Host_PointerExited"
-                            PointerPressed="Host_PointerPressed"
-                            PointerReleased="Host_PointerReleased"
-                            Tapped="BatteryHost_Tapped">
+                            CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
+                            Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
+                            Margin="0,3,0,0"
+                            VerticalAlignment="Stretch">
                         <FlyoutBase.AttachedFlyout>
                             <!-- Same backdrop rule applies to all popups in this file. -->
                             <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
@@ -373,7 +396,7 @@
                             </Flyout>
                         </FlyoutBase.AttachedFlyout>
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                            <Grid Width="22" VerticalAlignment="Center">
+                            <Grid Width="{x:Bind ViewModel.BatteryIconWidth, Mode=OneWay}" VerticalAlignment="Center">
                                 <TextBlock x:Name="BatteryFillGlyphText"
                                            Text="{x:Bind ViewModel.BatteryIcon, Mode=OneWay}"
                                            FontFamily="Segoe Fluent Icons"
@@ -396,24 +419,31 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+                    </Grid>
 
-                    <Border x:Name="ClockHost"
-                            Visibility="{x:Bind ViewModel.ClockVisibility, Mode=OneWay}"
-                            Background="Transparent"
-                            CornerRadius="6"
-                            Padding="8,0"
-                            VerticalAlignment="Stretch"
-                            PointerEntered="Host_PointerEntered"
-                            PointerExited="Host_PointerExited"
-                            PointerPressed="Host_PointerPressed"
-                            PointerReleased="Host_PointerReleased"
-                            Tapped="ClockHost_Tapped">
-                        <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}"
-                                   FontFamily="Segoe UI Variable"
-                                   FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
-                                   Foreground="White"
-                                   VerticalAlignment="Center" />
-                    </Border>
+                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
+                    <Grid Visibility="{x:Bind ViewModel.ClockVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          VerticalAlignment="Stretch"
+                          Margin="0,-3,0,0"
+                          PointerEntered="Host_PointerEntered"
+                          PointerExited="Host_PointerExited"
+                          PointerPressed="Host_PointerPressed"
+                          PointerReleased="Host_PointerReleased"
+                          Tapped="ClockHost_Tapped">
+                        <Border x:Name="ClockHost"
+                                Background="Transparent"
+                                CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
+                                Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
+                                Margin="0,3,0,0"
+                                VerticalAlignment="Stretch">
+                            <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}"
+                                       FontFamily="Segoe UI Variable"
+                                       FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
+                                       Foreground="White"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
                 </StackPanel>
 
                 <!-- Virtual desktop pill — centered over the full bar width -->
@@ -442,6 +472,17 @@
                 </Border>
             </Grid>
         </Border>
+        <!-- Right-edge hit extension for ClockHost. Lives in RootGrid so it doesn't affect column layout. -->
+        <Border Visibility="{x:Bind ViewModel.ClockVisibility, Mode=OneWay}"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Width="12"
+                Background="Transparent"
+                PointerEntered="ClockEdge_PointerEntered"
+                PointerExited="ClockEdge_PointerExited"
+                PointerPressed="ClockEdge_PointerPressed"
+                PointerReleased="ClockEdge_PointerReleased"
+                Tapped="ClockHost_Tapped" />
         <Border VerticalAlignment="Bottom" Height="1" Background="#18FFFFFF" />
     </Grid>
 </Window>

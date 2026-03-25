@@ -195,6 +195,27 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _textFontSize, value);
         }
 
+        private CornerRadius _hostCornerRadius = new CornerRadius(6);
+        public CornerRadius HostCornerRadius
+        {
+            get => _hostCornerRadius;
+            set => SetProperty(ref _hostCornerRadius, value);
+        }
+
+        private Thickness _hostPadding = new Thickness(8, 0, 8, 0);
+        public Thickness HostPadding
+        {
+            get => _hostPadding;
+            set => SetProperty(ref _hostPadding, value);
+        }
+
+        private double _batteryIconWidth = 22;
+        public double BatteryIconWidth
+        {
+            get => _batteryIconWidth;
+            set => SetProperty(ref _batteryIconWidth, value);
+        }
+
         private string _virtualDesktopText = "Desktop 1";
         public string VirtualDesktopText
         {

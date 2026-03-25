@@ -325,6 +325,10 @@ namespace MenuBar
             int barHeight = _settings.GetEffectiveBarHeight();
             ViewModel.IconFontSize = _settings.FontSizeIcon > 0 ? _settings.FontSizeIcon : barHeight * 0.62;
             ViewModel.TextFontSize = _settings.FontSizeText > 0 ? _settings.FontSizeText : barHeight * 0.44;
+            double hPad = Math.Round(barHeight * 0.29);
+            ViewModel.HostCornerRadius = new CornerRadius(Math.Round(barHeight * 0.21));
+            ViewModel.HostPadding = new Thickness(hPad, 0, hPad, 0);
+            ViewModel.BatteryIconWidth = ViewModel.IconFontSize + 4;
 
             ApplyMediaState(_mediaService?.CurrentState ?? MediaService.MediaState.Empty);
             ApplyBackgroundColor();
@@ -820,25 +824,25 @@ namespace MenuBar
 
         private void LogoHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            ToggleAttachedFlyout((FrameworkElement)sender);
+            ToggleAttachedFlyout(GetHostBorder(sender));
         }
 
         private void MediaHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            ToggleAttachedFlyout((FrameworkElement)sender);
+            ToggleAttachedFlyout(GetHostBorder(sender));
         }
 
         private void NetworkHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
             UpdateNetworkFlyout();
-            ToggleAttachedFlyout((FrameworkElement)sender);
+            ToggleAttachedFlyout(GetHostBorder(sender));
         }
 
         private void BatteryHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
             UpdateBattery();
             UpdateBatteryFlyout();
-            ToggleAttachedFlyout((FrameworkElement)sender);
+            ToggleAttachedFlyout(GetHostBorder(sender));
         }
 
         private void VirtualDesktopHost_PointerEntered(object sender, PointerRoutedEventArgs e)
@@ -979,38 +983,51 @@ namespace MenuBar
             _ = _mediaService.SendNextAsync();
         }
 
+        // When a host widget uses a transparent outer Grid for Fitts's Law hit-test expansion,
+        // the sender is a Grid; find the first Border child which carries the squircle background.
+        private static Border GetHostBorder(object sender)
+        {
+            if (sender is Border b) return b;
+            if (sender is Grid g && g.Children.Count > 0 && g.Children[0] is Border child) return child;
+            return null;
+        }
+
         private void Host_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is Border border)
-            {
+            if (GetHostBorder(sender) is Border border)
                 border.Background = _hoverBrush;
-            }
         }
 
         private void Host_PointerExited(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is Border border)
-            {
+            if (GetHostBorder(sender) is Border border)
                 border.Background = _transparentBrush;
-            }
         }
 
         private void Host_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
             // Visual feedback only; do not use this for clock state detection.
-            if (sender is Border border)
-            {
+            if (GetHostBorder(sender) is Border border)
                 border.Background = _pressedBrush;
-            }
         }
 
         private void Host_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is Border border)
-            {
+            if (GetHostBorder(sender) is Border border)
                 border.Background = _hoverBrush;
-            }
         }
+
+        private void ClockEdge_PointerEntered(object sender, PointerRoutedEventArgs e)
+            => ClockHost.Background = _hoverBrush;
+
+        private void ClockEdge_PointerExited(object sender, PointerRoutedEventArgs e)
+            => ClockHost.Background = _transparentBrush;
+
+        private void ClockEdge_PointerPressed(object sender, PointerRoutedEventArgs e)
+            => ClockHost.Background = _pressedBrush;
+
+        private void ClockEdge_PointerReleased(object sender, PointerRoutedEventArgs e)
+            => ClockHost.Background = _hoverBrush;
 
         #endregion
 
