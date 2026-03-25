@@ -78,7 +78,8 @@ namespace MenuBar
         {
             public uint Index;
             public IntPtr TargetHwnd;
-            public IntPtr SubMenuHandle;
+            public IntPtr SubMenuHandle; // Win32 path — non-zero when using TrackPopupMenu
+            public object UiaElement;   // UIA path — non-null when using ExpandOrInvoke
         }
 
         public MainWindow()
@@ -592,7 +593,21 @@ namespace MenuBar
             AppMenuPanel.Children.Clear();
 
             IntPtr hMenu = NativeMethods.GetMenu(hwnd);
-            if (hMenu == IntPtr.Zero) return;
+            if (hMenu == IntPtr.Zero)
+            {
+                // No Win32 HMENU — try UI Automation (WPF apps, VS Code, Win11 Notepad, etc.)
+                var uiaItems = UiaMenuService.GetMenuItems(hwnd);
+                if (uiaItems != null)
+                {
+                    double uiaFontSize = ViewModel.TextFontSize;
+                    foreach (var uiaItem in uiaItems)
+                    {
+                        AddMenuItemBorder(uiaItem.Label, false, uiaFontSize,
+                            new AppMenuItem { TargetHwnd = hwnd, UiaElement = uiaItem.Element });
+                    }
+                }
+                return;
+            }
 
             int count = NativeMethods.GetMenuItemCount(hMenu);
             if (count <= 0) return;
@@ -632,43 +647,49 @@ namespace MenuBar
                     bool grayed = (mii.fState & NativeMethods.MFS_GRAYED) != 0;
                     IntPtr subMenu = mii.hSubMenu;
 
-                    var textBlock = new TextBlock
-                    {
-                        Text = label,
-                        FontFamily = new FontFamily("Segoe UI Variable"),
-                        FontSize = fontSize,
-                        Foreground = grayed
-                            ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 120, 120, 120))
-                            : new SolidColorBrush(Microsoft.UI.Colors.White),
-                        VerticalAlignment = VerticalAlignment.Center
-                    };
-
-                    var border = new Border
-                    {
-                        Background = _transparentBrush,
-                        CornerRadius = new CornerRadius(6),
-                        Padding = new Thickness(8, 0, 8, 0),
-                        VerticalAlignment = VerticalAlignment.Stretch,
-                        Tag = new AppMenuItem { Index = i, TargetHwnd = hwnd, SubMenuHandle = subMenu },
-                        Child = textBlock
-                    };
-
-                    if (!grayed)
-                    {
-                        border.PointerEntered += Host_PointerEntered;
-                        border.PointerExited += Host_PointerExited;
-                        border.PointerPressed += Host_PointerPressed;
-                        border.PointerReleased += Host_PointerReleased;
-                        border.Tapped += AppMenuItem_Tapped;
-                    }
-
-                    AppMenuPanel.Children.Add(border);
+                    AddMenuItemBorder(label, grayed, fontSize,
+                        new AppMenuItem { Index = i, TargetHwnd = hwnd, SubMenuHandle = subMenu });
                 }
             }
             finally
             {
                 Marshal.FreeHGlobal(textBuf);
             }
+        }
+
+        private void AddMenuItemBorder(string label, bool grayed, double fontSize, AppMenuItem tag)
+        {
+            var textBlock = new TextBlock
+            {
+                Text = label,
+                FontFamily = new FontFamily("Segoe UI Variable"),
+                FontSize = fontSize,
+                Foreground = grayed
+                    ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 120, 120, 120))
+                    : new SolidColorBrush(Microsoft.UI.Colors.White),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var border = new Border
+            {
+                Background = _transparentBrush,
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(8, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Tag = tag,
+                Child = textBlock
+            };
+
+            if (!grayed)
+            {
+                border.PointerEntered += Host_PointerEntered;
+                border.PointerExited += Host_PointerExited;
+                border.PointerPressed += Host_PointerPressed;
+                border.PointerReleased += Host_PointerReleased;
+                border.Tapped += AppMenuItem_Tapped;
+            }
+
+            AppMenuPanel.Children.Add(border);
         }
 
         private void ApplyMediaState(MediaService.MediaState state)
@@ -849,24 +870,33 @@ namespace MenuBar
         {
             if (sender is not Border border) return;
             if (border.Tag is not AppMenuItem item) return;
-            if (item.SubMenuHandle == IntPtr.Zero) return;
 
-            GeneralTransform transform = border.TransformToVisual(null);
-            Windows.Foundation.Point pt = transform.TransformPoint(
-                new Windows.Foundation.Point(0, border.ActualHeight));
-            double scale = Content.XamlRoot?.RasterizationScale ?? 1.0;
-            int sx = (int)(pt.X * scale) + NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
-            int sy = (int)(pt.Y * scale) + NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
+            if (item.SubMenuHandle != IntPtr.Zero)
+            {
+                // Win32 path: show the app's submenu as a native popup from our bar
+                GeneralTransform transform = border.TransformToVisual(null);
+                Windows.Foundation.Point pt = transform.TransformPoint(
+                    new Windows.Foundation.Point(0, border.ActualHeight));
+                double scale = Content.XamlRoot?.RasterizationScale ?? 1.0;
+                int sx = (int)(pt.X * scale) + NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
+                int sy = (int)(pt.Y * scale) + NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
 
-            int cmd = NativeMethods.TrackPopupMenu(
-                item.SubMenuHandle,
-                NativeMethods.TPM_TOPALIGN | NativeMethods.TPM_LEFTALIGN |
-                NativeMethods.TPM_RETURNCMD | NativeMethods.TPM_NONOTIFY,
-                sx, sy, 0, _hwnd, IntPtr.Zero);
+                int cmd = NativeMethods.TrackPopupMenu(
+                    item.SubMenuHandle,
+                    NativeMethods.TPM_TOPALIGN | NativeMethods.TPM_LEFTALIGN |
+                    NativeMethods.TPM_RETURNCMD | NativeMethods.TPM_NONOTIFY,
+                    sx, sy, 0, _hwnd, IntPtr.Zero);
 
-            if (cmd > 0)
-                NativeMethods.PostMessage(item.TargetHwnd, NativeMethods.WM_COMMAND,
-                    (IntPtr)cmd, IntPtr.Zero);
+                if (cmd > 0)
+                    NativeMethods.PostMessage(item.TargetHwnd, NativeMethods.WM_COMMAND,
+                        (IntPtr)cmd, IntPtr.Zero);
+            }
+            else if (item.UiaElement != null)
+            {
+                // UIA path: ask the app to expand its own menu dropdown.
+                // The dropdown opens in the target app's window at its original position.
+                UiaMenuService.ExpandOrInvokeMenuItem(item.UiaElement);
+            }
         }
 
         private void ClockHost_Tapped(object sender, TappedRoutedEventArgs e)
