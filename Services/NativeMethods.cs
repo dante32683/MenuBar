@@ -176,6 +176,12 @@ namespace MenuBar.Services
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS systemPowerStatus);
 
+        // Power Saver overlay GUID (Power Mode slider leftmost position)
+        public static readonly Guid PowerSaverOverlayGuid = new Guid("961cc777-2547-4f9d-8174-7d86181b8a7a");
+
+        [DllImport("powrprof.dll")]
+        public static extern uint PowerGetEffectiveOverlayScheme(out Guid EffectiveOverlayGuid);
+
         [DllImport("user32.dll")]
         public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 

@@ -15,6 +15,7 @@ namespace MenuBar.Services
             public bool IsCalculating { get; set; }
             public bool Charging { get; set; }
             public bool PluggedIn { get; set; }
+            public bool EnergySaverOn { get; set; }
             public int? SecondsRemaining { get; set; }
         }
 
@@ -46,6 +47,9 @@ namespace MenuBar.Services
                     }
 
                     info.PluggedIn = status.ACLineStatus == 1;
+                    info.EnergySaverOn = status.SystemStatusFlag == 1
+                        || (NativeMethods.PowerGetEffectiveOverlayScheme(out Guid overlayGuid) == 0
+                            && overlayGuid == NativeMethods.PowerSaverOverlayGuid);
                     info.IsCalculating = status.BatteryLifePercent == byte.MaxValue;
                     info.Percent = info.IsCalculating ? 0 : status.BatteryLifePercent;
                     var batteryReport = Battery.AggregateBattery.GetReport();

@@ -15,6 +15,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using System.Runtime.InteropServices.WindowsRuntime;
 using MenuBar.Services;
 using MenuBar.ViewModels;
+using Windows.Devices.Power;
 using WinRT.Interop;
 
 namespace MenuBar
@@ -203,13 +204,18 @@ namespace MenuBar
         private void SetupTimers()
         {
             _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _clockTimer.Tick += (_, _) => UpdateClock();
+            _clockTimer.Tick += (_, _) => { UpdateClock(); UpdateVirtualDesktop(); };
             _clockTimer.Start();
 
-            _batteryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _batteryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
             _batteryTimer.Tick += (_, _) => UpdateBattery();
             _batteryTimer.Start();
+
+            Battery.AggregateBattery.ReportUpdated += OnBatteryReportUpdated;
         }
+
+        private void OnBatteryReportUpdated(Battery sender, object args)
+            => DispatcherQueue.TryEnqueue(UpdateBattery);
 
         private void SetupForegroundHook()
         {
@@ -515,7 +521,7 @@ namespace MenuBar
                 {
                     ViewModel.BatteryText = $"{_batteryInfo.Percent}%";
                     ViewModel.BatteryIcon = GetBatteryFillGlyph(_batteryInfo.Percent);
-                    var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn);
+                    var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn, _batteryInfo.EnergySaverOn);
                     BatteryFillGlyphText.Foreground = brush;
 
                     BatteryOutlineGlyphText.Visibility = (brush == _batteryDefaultBrush)
@@ -760,7 +766,7 @@ namespace MenuBar
                     ? (_batteryInfo.Percent >= 99 ? "Plugged in, fully charged" : "Smart charging")
                     : "On battery power");
             BatteryFlyoutIcon.Text = GetBatteryFillGlyph(_batteryInfo.Percent);
-            BatteryFlyoutIcon.Foreground = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn);
+            BatteryFlyoutIcon.Foreground = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn, _batteryInfo.EnergySaverOn);
 
             string remaining = FormatRemainingTime(_batteryInfo.SecondsRemaining);
             if (string.IsNullOrWhiteSpace(remaining))
@@ -1070,12 +1076,11 @@ namespace MenuBar
             return MobileBatteryGlyphs[bucket];
         }
 
-        private SolidColorBrush GetBatteryFillBrush(int percent, bool charging, bool pluggedIn)
+        private SolidColorBrush GetBatteryFillBrush(int percent, bool charging, bool pluggedIn, bool energySaverOn)
         {
             if (charging) return _batteryChargingBrush;
             if (pluggedIn) return _batteryPluggedBrush;
-            if (Windows.System.Power.PowerManager.EnergySaverStatus == Windows.System.Power.EnergySaverStatus.On)
-                return _batterySaverBrush;
+            if (energySaverOn) return _batterySaverBrush;
             return percent <= 20 ? _batterySaverBrush : _batteryDefaultBrush;
         }
 
@@ -1171,6 +1176,7 @@ namespace MenuBar
         {
             _clockTimer?.Stop();
             _batteryTimer?.Stop();
+            Battery.AggregateBattery.ReportUpdated -= OnBatteryReportUpdated;
 
             if (_foregroundHook != IntPtr.Zero)
             {

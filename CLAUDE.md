@@ -4,7 +4,7 @@ Guidance for Claude Code (claude.ai/code) when working in this repo.
 
 ## What This Is
 
-A macOS-style menu bar for Windows built with WinUI 3. It runs as a top-docked Windows AppBar and shows the active window title, media controls, network/battery status, and a clock. It is unpackaged, non-MSIX, and self-contained.
+A macOS-style menu bar for Windows built with WinUI 3. It runs as a top-docked Windows AppBar and shows the active window title, media controls, network/battery status, virtual desktop label, and a clock. Unpackaged, non-MSIX, self-contained.
 
 ## Build & Run
 
@@ -16,91 +16,97 @@ dotnet build
 dotnet publish -c Release -r win-x64 -p:Platform=x64 -o publish/win-x64
 ```
 
-No solution file — build from the project directory directly. No tests exist in the project.
+No solution file — build from the project directory directly. No tests exist.
 
 ## Architecture
 
-Single-window app with one XAML page. `MainWindow.xaml` / `MainWindow.xaml.cs` coordinates the services and UI.
+Single-window app. `MainWindow.xaml` / `MainWindow.xaml.cs` coordinates all services and UI.
 
 **Data flow — event-driven with minimal polling:**
 - Active window title: `SetWinEventHook` (`EVENT_SYSTEM_FOREGROUND` + `EVENT_OBJECT_NAMECHANGE`)
-- Media: `MediaService` subscribes to `CurrentSessionChanged`, `MediaPropertiesChanged`, and `PlaybackInfoChanged`
+- Virtual desktop: `SetWinEventHook` (`EVENT_SYSTEM_DESKTOPSWITCH`) + 1s clock timer poll (hook unreliable for AppBar windows)
+- Media: `MediaService` subscribes to `CurrentSessionChanged`, `MediaPropertiesChanged`, `PlaybackInfoChanged`
 - Network: `NetworkInformation.NetworkStatusChanged`
 - Clock: `DispatcherTimer` every 1s
-- Battery: `DispatcherTimer` every 30s
+- Battery: `Battery.AggregateBattery.ReportUpdated` event (instant, background thread → `DispatcherQueue.TryEnqueue`) + `DispatcherTimer` every 10s (fallback for power overlay changes)
 
 **Key components:**
-- `ViewModels/ObservableObject` — Base `INotifyPropertyChanged` class with `SetProperty`.
-- `ViewModels/MainViewModel` — Uses `x:Bind` `OneWay` bindings for all bar segments.
-- `Services/MediaService` — Handles media sessions and SMTC events; uses session APIs instead of keyboard simulation.
-- `Services/HardwareService` — Battery via `GetSystemPowerStatus` plus `Battery.AggregateBattery.GetReport()`. Network via `Windows.Networking.Connectivity.NetworkInformation`.
-- `Services/NativeMethods` — Win32 P/Invoke declarations for AppBar, window management, keyboard, and WinEvent hooks.
-- `Services/SettingsService` — Reads and writes `settings.json` from `AppContext.BaseDirectory`; settings hot-reload from the context menu.
+- `ViewModels/ObservableObject` — Base `INotifyPropertyChanged` with `SetProperty`.
+- `ViewModels/MainViewModel` — `x:Bind OneWay` bindings for all bar segments. Scaling properties (`HostCornerRadius`, `HostPadding`, `BatteryIconWidth`, `IconFontSize`, `TextFontSize`) are computed from `bar_height` in `LoadSettings()`.
+- `Services/MediaService` — SMTC session API (no keyboard simulation).
+- `Services/HardwareService` — Battery via `Battery.AggregateBattery.GetReport()` + `GetSystemPowerStatus`. Network via `Windows.Networking.Connectivity.NetworkInformation`.
+- `Services/VirtualDesktopService` — Registry-only; reads `CurrentVirtualDesktop` GUID and `VirtualDesktopIDs` blob from `HKCU\...\Explorer\VirtualDesktops`, resolves name from `Desktops\{GUID}\Name`.
+- `Services/NativeMethods` — Win32 P/Invoke: AppBar, window management, keyboard, WinEvent hooks.
+- `Services/SettingsService` — Reads/writes `settings.json` from `AppContext.BaseDirectory`; hot-reload from context menu.
 
-**Window behavior:** Registers as a top-edge AppBar via `SHAppBarMessage`, uses `WS_EX_TOOLWINDOW` to stay out of Alt-Tab, and tries `DesktopAcrylicBackdrop` before falling back to `MicaBackdrop`.
+**Window behavior:** Top-edge AppBar via `SHAppBarMessage`, `WS_EX_TOOLWINDOW` to hide from Alt-Tab, `DesktopAcrylicBackdrop` with `MicaBackdrop` fallback.
 
-**Flyout pattern:** Logo, media, network, and battery use `FlyoutBase.AttachedFlyout` on tap. The clock sends `Win+N` to open notification center and suppresses a second send if it was already open.
+**Flyout pattern:** Logo, media, network, battery use `FlyoutBase.AttachedFlyout` on the **inner Border** (not the outer wrapper Grid). Always call `ToggleAttachedFlyout(GetHostBorder(sender))` — never `(FrameworkElement)sender` — because the Tapped event fires on the outer Grid. The clock sends `Win+N` to open notification center.
 
-**Flyout styling:** All flyouts use `ShouldConstrainToRootBounds="False"` with `DesktopAcrylicBackdrop` as `FlyoutBase.SystemBackdrop`. A shared `AcrylicBrush` resource (`FlyoutAcrylicBackground`) tints the presenter background with `SystemAccentColorDark2`. `xmlns:media="using:Microsoft.UI.Xaml.Media"` is declared on the `Window` element so `DesktopAcrylicBackdrop` can be created in XAML.
+**Flyout styling:** All flyouts: `ShouldConstrainToRootBounds="False"`, `FlyoutBase.SystemBackdrop = DesktopAcrylicBackdrop`, `AcrylicBrush` (`FlyoutAcrylicBackground`) as tint with `SystemAccentColorDark2`. `xmlns:media="using:Microsoft.UI.Xaml.Media"` declared on `Window` element.
 
-- Logo: `MenuFlyout` with `MenuFlyoutPresenterStyle` background
-- Media: custom `Flyout` with `FlyoutPresenterStyle` (`Padding=0`, `MinWidth=300`, `CornerRadius=8`)
-- Network: custom `Flyout` with `FlyoutPresenterStyle` (`Padding=0`, `MinWidth=260`, `CornerRadius=8`)
-- Battery: custom `Flyout` with `FlyoutPresenterStyle` (`Padding=0`, `MinWidth=240`, `CornerRadius=8`)
-- Context menu: `MenuFlyout` on `Grid.ContextFlyout` with the same styling
+## Fitts's Law Hit-Test Expansion
+
+All 5 interactive widgets (Logo, Media, Network, Battery, Clock) use an outer/inner wrapper pattern:
+
+- **Outer transparent `Grid`**: `Margin="0,-3,0,0"` extends hit area 3px above the StackPanel to reach y=0 (screen top edge). Carries Visibility binding, Pointer events, and Tapped.
+- **Inner `Border`** (`x:Name="XxxHost"`): `Margin="0,3,0,0"` compensates, keeping the squircle visual at the original position. Carries `FlyoutBase.AttachedFlyout`.
+
+`GetHostBorder(sender)` resolves the inner Border from a Grid sender (static widgets) or Border sender (dynamic AppMenuPanel items).
+
+**Clock right-edge extension:** A separate transparent `Border` in `RootGrid` (`HorizontalAlignment="Right"`, `Width="12"`) adds a 12px hit zone at the screen's right edge. It's outside the column layout to avoid affecting widget positions. Its pointer events directly set `ClockHost.Background`; its Tapped calls `ClockHost_Tapped`.
+
+Do not use negative right margins on StackPanel items to extend hit areas — this shrinks the Auto-width column and shifts the entire StackPanel.
 
 ## Battery Widget
 
-**Bar icon:** Two overlapping `TextBlock` elements in a `Grid` (`BatteryFillGlyphText` + `BatteryOutlineGlyphText`). The fill glyph (`\uEBA0`–`\uEBAA`) is colored and the white outline glyph creates the border. No lightning bolt; charging is shown by color only.
+**Bar icon:** Two overlapping `TextBlock` elements (`BatteryFillGlyphText` + `BatteryOutlineGlyphText`) in a `Grid` with `Width="{x:Bind ViewModel.BatteryIconWidth}"`. Fill glyph (`\uEBA0`–`\uEBAA`) is colored; outline glyph is white. No lightning bolt; charging shown by color only.
 
-**Icon color states (set in `UpdateBattery()` via `GetBatteryFillBrush()`):**
+**Icon color priority (evaluated in order):**
 
-| State | `BatteryStatus` | Color | Outline visible |
-|---|---|---|---|
-| Actively charging | `Charging` | Green `#6AC45B` | Yes |
-| Plugged in, conservation mode / fully charged | `Idle` | Teal `#00B7C3` | Yes |
-| Discharging, percent > 20 | `Discharging` | White | No |
-| Discharging, percent ≤ 20 | `Discharging` | Amber `#EAA300` | Yes |
-| No battery (AC only) | `NotPresent` | White | No |
+1. Charging (`ChargeRateInMilliwatts > 0`) → Green `#6AC45B`
+2. Plugged in / conservation (`ACLineStatus == 1`, not charging) → Teal `#00B7C3`
+3. Battery Saver on (`SystemStatusFlag == 1`) → Amber `#EAA300`
+4. Discharging ≤ 20% → Amber `#EAA300`
+5. Normal discharging → White
 
-Charge state comes from `Windows.Devices.Power.Battery.AggregateBattery.GetReport()`. Prefer `ChargeRateInMilliwatts > 0` when available; some Lenovo drivers report `Charging` and set `BatteryFlag & 8` even during conservation mode, so do not trust `GetSystemPowerStatus.BatteryFlag & 8` or `BatteryStatus` alone.
+`EnergySaverOn` is true when either `SYSTEM_POWER_STATUS.SystemStatusFlag == 1` (Windows Battery Saver) OR `PowerGetEffectiveOverlayScheme` returns `961cc777-2547-4f9d-8174-7d86181b8a7a` (Power Saver overlay / Power Mode slider leftmost). Do NOT use `Windows.System.Power.PowerManager.EnergySaverStatus` — it throws in unpackaged apps. `SystemStatusFlag` alone also does not reflect the Power Mode overlay. Prefer `ChargeRateInMilliwatts > 0` for charging detection; some Lenovo drivers misreport `BatteryFlag & 8`. Do not use `GetSystemPowerStatus.BatteryFlag & 8` alone.
 
-Brush fields: `_batteryDefaultBrush` (white), `_batteryChargingBrush` (green), `_batteryPluggedBrush` (teal), `_batterySaverBrush` (amber).
+## Virtual Desktop Widget
 
-**Battery flyout:** Custom `Flyout` with a two-row `Grid`. Row 0 shows `BatteryFlyoutIcon`, `BatteryFlyoutPercent`, and `BatteryFlyoutStatus`; row 1 shows `BatteryFlyoutTime` when available. `BatteryFlyoutStatus` is one of `Charging`, `Plugged in, fully charged`, `Smart charging`, or `On battery power`. `UpdateBatteryFlyout()` fills the fields right before open.
+Registry-only via `VirtualDesktopService.GetCurrentDesktopLabel()`:
+1. Read `CurrentVirtualDesktop` (16-byte GUID, little-endian fields) from `HKCU\...\Explorer\VirtualDesktops`
+2. Find ordinal by scanning `VirtualDesktopIDs` (packed 16-byte GUIDs)
+3. Read name from `Desktops\{GUID}\Name`; fall back to `"Desktop N"`
 
-## Network Flyout
+**Timing:** The registry `CurrentVirtualDesktop` updates correctly and immediately on every desktop switch. However, `EVENT_SYSTEM_DESKTOPSWITCH` does not fire reliably from an AppBar window. The label is therefore polled every 1s via the clock `DispatcherTimer` (which calls `UpdateVirtualDesktop()` alongside `UpdateClock()`). `OnDesktopSwitchEvent` also calls `UpdateVirtualDesktop()` directly for an instant update when it does fire. Do not use a deferred timer — the registry is already correct by the time any code runs.
 
-Custom `Flyout` with a `Grid` layout matching the battery flyout. Row 0 shows `NetworkFlyoutIcon`, `NetworkFlyoutName`, and `NetworkFlyoutStatus`; row 1 shows `NetworkFlyoutSpeed` when available. `UpdateNetworkFlyout()` fills the fields right before open.
+`VirtualDesktops\Desktops\` may contain orphaned subkeys from deleted desktops; only GUIDs present in `VirtualDesktopIDs` are active.
 
 ## Clock Toggle (Notification Center)
 
-Tapping `ClockHost` sends `Win+N` to open notification center. To avoid reopening it on a second tap, the bar tracks the last external foreground window via `EVENT_SYSTEM_FOREGROUND`:
-
+`ClockHost_Tapped` sends `Win+N`. To avoid reopening when already open:
 - `OnForegroundEvent` stores `_lastExternalForegroundHwnd` when `hwnd != _hwnd`.
-- `ClockHost_Tapped` skips `Win+N` if `_lastExternalForegroundHwnd` is `ShellExperienceHost`, then clears the field.
-- `IsShellExperienceHostWindow` checks the process name via `GetWindowThreadProcessId` and `Process.GetProcessById`; failures return false.
+- Skip `Win+N` if `_lastExternalForegroundHwnd` is `ShellExperienceHost` (checked via process name), then clear the field.
 
-Do not use `FindWindow("Shell_NotificationCenter", ...)` or snapshot state in `PointerPressed`; both are unreliable here.
+Do not use `FindWindow("Shell_NotificationCenter", ...)` or snapshot state in `PointerPressed`.
 
 ## Configuration
 
-`settings.json` sits next to the executable and controls bar segment visibility, bar height (28–56px), clock format, and accent color usage. It is copied to output with `<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>`.
+`settings.json` next to the executable controls visibility, `bar_height` (28–56px), clock format, accent color. Copied to output with `PreserveNewest`. Scaling ViewModel properties (`HostCornerRadius`, `HostPadding`, `BatteryIconWidth`, `IconFontSize`, `TextFontSize`) are recomputed in `LoadSettings()` from `bar_height`.
 
 ## Key Constraints
 
 - Target: .NET 8, Windows App SDK 1.5, minimum Windows 10 1809
-- Unpackaged app (`WindowsPackageType=None`): no MSIX, no package identity
-- Icons use Segoe Fluent Icons glyphs, not image assets
-- Bar text is white; battery icon color is state-driven
+- Unpackaged (`WindowsPackageType=None`): no MSIX, no package identity
+- Icons: Segoe Fluent Icons glyphs only, not image assets
 - Root `Grid` uses `RequestedTheme="Dark"` for consistent dark flyouts
-- Use Segoe UI Variable per `TextBlock`; do not set `FontFamily` on `Grid`/`Panel`
+- Use `FontFamily="Segoe UI Variable"` per `TextBlock`; never on `Grid`/`Panel`
 - Publish requires `-p:Platform=x64`
-- `AcrylicBrush.BackgroundSource` does not exist in WinUI 3; use `FlyoutBase.SystemBackdrop = new DesktopAcrylicBackdrop()` and `AcrylicBrush` only as tint
+- `AcrylicBrush.BackgroundSource` does not exist in WinUI 3 — use `FlyoutBase.SystemBackdrop` + `AcrylicBrush` as tint only
 - `FlyoutBase.SystemBackdrop` only works with `ShouldConstrainToRootBounds="False"`
-- `{StaticResource SystemAccentColorDark2}` is static; runtime accent updates only affect the bar background, not flyout tint
-- Do not use `GetSystemPowerStatus.BatteryFlag & 8` for charging detection; use `Battery.AggregateBattery.GetReport().Status` instead
+- `{StaticResource SystemAccentColorDark2}` is static; runtime accent updates only affect bar background
 
 ## Planning & Audit Workflow
 
-Before implementing any change, write a plan and audit it for correctness, stability, compile safety, and WinUI 3 constraints. If the audit fails, rewrite and re-audit before implementing. This applies to every planning phase.
+Before implementing any change, write a plan and audit it for correctness, stability, compile safety, and WinUI 3 constraints. If the audit fails, rewrite and re-audit before implementing.
