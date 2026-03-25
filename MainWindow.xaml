@@ -4,12 +4,15 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:media="using:Microsoft.UI.Xaml.Media"
     mc:Ignorable="d"
     Title="MenuBar">
 
+    <!-- Dark theme keeps flyouts and text consistent with the bar styling. -->
     <Grid x:Name="RootGrid" Background="Transparent" RequestedTheme="Dark">
         <Grid.Resources>
             <Style x:Key="BarTextBlockStyle" TargetType="TextBlock">
+                <!-- Set this per TextBlock; applying FontFamily on container panels breaks the WinUI XAML compiler. -->
                 <Setter Property="FontFamily" Value="Segoe UI Variable" />
             </Style>
 
@@ -19,10 +22,26 @@
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="CornerRadius" Value="8" />
             </Style>
+
+            <!-- The brush is only a tint layer; the actual blur comes from Flyout/SystemBackdrop. -->
+            <AcrylicBrush x:Key="FlyoutAcrylicBackground"
+                          TintColor="{StaticResource SystemAccentColorDark2}"
+                          TintOpacity="0.6"
+                          TintLuminosityOpacity="0.8"
+                          FallbackColor="{StaticResource SystemAccentColorDark2}" />
         </Grid.Resources>
 
         <Grid.ContextFlyout>
-            <MenuFlyout>
+            <!-- SystemBackdrop only applies here because ShouldConstrainToRootBounds is false. -->
+            <MenuFlyout ShouldConstrainToRootBounds="False">
+                <MenuFlyout.SystemBackdrop>
+                    <media:DesktopAcrylicBackdrop />
+                </MenuFlyout.SystemBackdrop>
+                <MenuFlyout.MenuFlyoutPresenterStyle>
+                    <Style TargetType="MenuFlyoutPresenter">
+                        <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
+                    </Style>
+                </MenuFlyout.MenuFlyoutPresenterStyle>
                 <MenuFlyoutItem Text="Open settings" Click="OpenSettingsFile_Click" />
                 <MenuFlyoutItem Text="Reload settings" Click="ReloadSettings_Click" />
                 <MenuFlyoutSeparator />
@@ -52,11 +71,17 @@
                             PointerPressed="Host_PointerPressed"
                             PointerReleased="Host_PointerReleased"
                             Tapped="LogoHost_Tapped">
-                        <ToolTipService.ToolTip>
-                            <ToolTip Content="{x:Bind ViewModel.LogoTooltip, Mode=OneWay}" />
-                        </ToolTipService.ToolTip>
                         <FlyoutBase.AttachedFlyout>
-                            <MenuFlyout>
+                            <!-- Same backdrop rule applies to all popups in this file. -->
+                            <MenuFlyout ShouldConstrainToRootBounds="False">
+                                <MenuFlyout.SystemBackdrop>
+                                    <media:DesktopAcrylicBackdrop />
+                                </MenuFlyout.SystemBackdrop>
+                                <MenuFlyout.MenuFlyoutPresenterStyle>
+                                    <Style TargetType="MenuFlyoutPresenter">
+                                        <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
+                                    </Style>
+                                </MenuFlyout.MenuFlyoutPresenterStyle>
                                 <MenuFlyoutItem Text="Settings" Click="OpenWindowsSettings_Click" />
                                 <MenuFlyoutSeparator />
                                 <MenuFlyoutItem Text="Sleep" Click="SleepSystem_Click" />
@@ -83,6 +108,13 @@
                         </Grid>
                     </Border>
 
+                    <Image Source="{x:Bind ViewModel.ActiveWindowIcon, Mode=OneWay}"
+                           Visibility="{x:Bind ViewModel.ActiveWindowIconVisibility, Mode=OneWay}"
+                           Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                           Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                           Margin="8,0,0,0"
+                           VerticalAlignment="Center" />
+
                     <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitle, Mode=OneWay}"
                                Visibility="{x:Bind ViewModel.TitleVisibility, Mode=OneWay}"
                                Foreground="White"
@@ -92,11 +124,7 @@
                                MaxWidth="340"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
-                               Margin="8,0,0,0">
-                        <ToolTipService.ToolTip>
-                            <ToolTip Content="{x:Bind ViewModel.ActiveWindowTitleTooltip, Mode=OneWay}" />
-                        </ToolTipService.ToolTip>
-                    </TextBlock>
+                               Margin="4,0,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Stretch">
@@ -111,16 +139,18 @@
                             PointerPressed="Host_PointerPressed"
                             PointerReleased="Host_PointerReleased"
                             Tapped="MediaHost_Tapped">
-                        <ToolTipService.ToolTip>
-                            <ToolTip Content="{x:Bind ViewModel.MediaTooltip, Mode=OneWay}" />
-                        </ToolTipService.ToolTip>
                         <FlyoutBase.AttachedFlyout>
+                            <!-- Same backdrop rule applies to all popups in this file. -->
                             <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
+                                <Flyout.SystemBackdrop>
+                                    <media:DesktopAcrylicBackdrop />
+                                </Flyout.SystemBackdrop>
                                 <Flyout.FlyoutPresenterStyle>
                                     <Style TargetType="FlyoutPresenter">
                                         <Setter Property="Padding" Value="0" />
                                         <Setter Property="MinWidth" Value="300" />
                                         <Setter Property="CornerRadius" Value="8" />
+                                        <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
                                     </Style>
                                 </Flyout.FlyoutPresenterStyle>
                                 <Grid Padding="16"
@@ -202,16 +232,63 @@
                             PointerPressed="Host_PointerPressed"
                             PointerReleased="Host_PointerReleased"
                             Tapped="NetworkHost_Tapped">
-                        <ToolTipService.ToolTip>
-                            <ToolTip Content="{x:Bind ViewModel.NetworkTooltip, Mode=OneWay}" />
-                        </ToolTipService.ToolTip>
                         <FlyoutBase.AttachedFlyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuFlyoutItem x:Name="NetworkMenuPrimaryItem" Text="Not connected" />
-                                <MenuFlyoutItem x:Name="NetworkMenuSecondaryItem" Text="" Visibility="Collapsed" />
-                                <MenuFlyoutItem x:Name="NetworkMenuDownItem" Text="" Visibility="Collapsed" />
-                                <MenuFlyoutItem x:Name="NetworkMenuUpItem" Text="" Visibility="Collapsed" />
-                            </MenuFlyout>
+                            <!-- Same backdrop rule applies to all popups in this file. -->
+                            <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
+                                <Flyout.SystemBackdrop>
+                                    <media:DesktopAcrylicBackdrop />
+                                </Flyout.SystemBackdrop>
+                                <Flyout.FlyoutPresenterStyle>
+                                    <Style TargetType="FlyoutPresenter">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="MinWidth" Value="260" />
+                                        <Setter Property="CornerRadius" Value="8" />
+                                        <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
+                                    </Style>
+                                </Flyout.FlyoutPresenterStyle>
+                                <Grid Padding="16" MinWidth="260">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="NetworkFlyoutIcon"
+                                                   Text="&#xE701;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="36"
+                                                   Foreground="White"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,14,0" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock x:Name="NetworkFlyoutName"
+                                                       Text="Wi-Fi"
+                                                       FontFamily="Segoe UI Variable"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="22"
+                                                       Foreground="White"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxWidth="180" />
+                                            <TextBlock x:Name="NetworkFlyoutStatus"
+                                                       Text="Connected"
+                                                       FontFamily="Segoe UI Variable"
+                                                       FontSize="12"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock x:Name="NetworkFlyoutSpeed"
+                                               Grid.Row="1"
+                                               Text=""
+                                               FontFamily="Segoe UI Variable"
+                                               FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Visibility="Collapsed"
+                                               Margin="0,10,0,0" />
+                                </Grid>
+                            </Flyout>
                         </FlyoutBase.AttachedFlyout>
                         <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="{x:Bind ViewModel.NetworkIcon, Mode=OneWay}"
@@ -233,15 +310,61 @@
                             PointerPressed="Host_PointerPressed"
                             PointerReleased="Host_PointerReleased"
                             Tapped="BatteryHost_Tapped">
-                        <ToolTipService.ToolTip>
-                            <ToolTip Content="{x:Bind ViewModel.BatteryTooltip, Mode=OneWay}" />
-                        </ToolTipService.ToolTip>
                         <FlyoutBase.AttachedFlyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuFlyoutItem x:Name="BatteryMenuPrimaryItem" Text="AC power &#x2014; no battery detected" />
-                                <MenuFlyoutItem x:Name="BatteryMenuSecondaryItem" Text="" Visibility="Collapsed" />
-                                <MenuFlyoutItem x:Name="BatteryMenuTimeItem" Text="" Visibility="Collapsed" />
-                            </MenuFlyout>
+                            <!-- Same backdrop rule applies to all popups in this file. -->
+                            <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
+                                <Flyout.SystemBackdrop>
+                                    <media:DesktopAcrylicBackdrop />
+                                </Flyout.SystemBackdrop>
+                                <Flyout.FlyoutPresenterStyle>
+                                    <Style TargetType="FlyoutPresenter">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="MinWidth" Value="240" />
+                                        <Setter Property="CornerRadius" Value="8" />
+                                        <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
+                                    </Style>
+                                </Flyout.FlyoutPresenterStyle>
+                                <Grid Padding="16" MinWidth="240">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="BatteryFlyoutIcon"
+                                                   Text="&#xEBA5;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="36"
+                                                   Foreground="White"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,14,0" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock x:Name="BatteryFlyoutPercent"
+                                                       Text="100%"
+                                                       FontFamily="Segoe UI Variable"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="22"
+                                                       Foreground="White" />
+                                            <TextBlock x:Name="BatteryFlyoutStatus"
+                                                       Text="On battery"
+                                                       FontFamily="Segoe UI Variable"
+                                                       FontSize="12"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock x:Name="BatteryFlyoutTime"
+                                               Grid.Row="1"
+                                               Text=""
+                                               FontFamily="Segoe UI Variable"
+                                               FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Visibility="Collapsed"
+                                               Margin="0,10,0,0" />
+                                </Grid>
+                            </Flyout>
                         </FlyoutBase.AttachedFlyout>
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <Grid Width="22" VerticalAlignment="Center">
@@ -259,16 +382,6 @@
                                            Foreground="White"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Center" />
-                                <Path x:Name="BatteryBoltPath"
-                                      Visibility="Collapsed"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"
-                                      Fill="White"
-                                      Data="M 8,0 L 4.8,4.8 H 7.1 L 5.8,10 L 10,4.4 H 7.7 Z"
-                                      Stretch="Uniform"
-                                      Width="10"
-                                      Height="12"
-                                      Margin="0,-4,0,0" />
                             </Grid>
                             <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}"
                                        FontFamily="Segoe UI Variable"
@@ -289,9 +402,6 @@
                             PointerPressed="Host_PointerPressed"
                             PointerReleased="Host_PointerReleased"
                             Tapped="ClockHost_Tapped">
-                        <ToolTipService.ToolTip>
-                            <ToolTip Content="{x:Bind ViewModel.ClockTooltip, Mode=OneWay}" />
-                        </ToolTipService.ToolTip>
                         <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}"
                                    FontFamily="Segoe UI Variable"
                                    FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"

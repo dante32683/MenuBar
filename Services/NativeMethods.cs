@@ -43,6 +43,21 @@ namespace MenuBar.Services
         public const uint EVENT_OBJECT_NAMECHANGE = 0x800C;
         public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
 
+        // Window icon messages
+        public const int WM_GETICON = 0x007F;
+        public const int ICON_SMALL = 0;
+        public const int ICON_BIG = 1;
+        public const int ICON_SMALL2 = 2;
+
+        // Class long indices for icon handles
+        public const int GCLP_HICONSM = -34;
+        public const int GCLP_HICON = -14;
+
+        // GDI / DrawIconEx
+        public const int DIB_RGB_COLORS = 0;
+        public const int DI_NORMAL = 0x0003;
+        public const int SM_CXSMICON = 49;
+
         public delegate void WinEventDelegate(
             IntPtr hWinEventHook,
             uint eventType,
@@ -73,6 +88,22 @@ namespace MenuBar.Services
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct BITMAPINFOHEADER
+        {
+            public int biSize;
+            public int biWidth;
+            public int biHeight;
+            public short biPlanes;
+            public short biBitCount;
+            public int biCompression;
+            public int biSizeImage;
+            public int biXPelsPerMeter;
+            public int biYPelsPerMeter;
+            public int biClrUsed;
+            public int biClrImportant;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct SYSTEM_POWER_STATUS
         {
             public byte ACLineStatus;
@@ -98,6 +129,9 @@ namespace MenuBar.Services
 
         [DllImport("user32.dll")]
         public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
@@ -125,5 +159,41 @@ namespace MenuBar.Services
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
+        // x64 and x86 variants — use GetClassLongPtr() wrapper below
+        [DllImport("user32.dll", EntryPoint = "GetClassLongPtrW")]
+        private static extern IntPtr GetClassLongPtr64(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", EntryPoint = "GetClassLongW")]
+        private static extern uint GetClassLong32(IntPtr hWnd, int nIndex);
+
+        public static IntPtr GetClassLongPtr(IntPtr hWnd, int nIndex) =>
+            IntPtr.Size == 8 ? GetClassLongPtr64(hWnd, nIndex) : (IntPtr)GetClassLong32(hWnd, nIndex);
+
+        [DllImport("gdi32.dll")]
+        public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll")]
+        public static extern IntPtr CreateDIBSection(IntPtr hdc, ref BITMAPINFOHEADER pbmi, int iUsage,
+            out IntPtr ppvBits, IntPtr hSection, int dwOffset);
+
+        [DllImport("gdi32.dll")]
+        public static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DeleteObject(IntPtr ho);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DeleteDC(IntPtr hdc);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon,
+            int cxWidth, int cyWidth, int istepIfAniCur, IntPtr hbrFlickerFreeDraw, int diFlags);
     }
 }

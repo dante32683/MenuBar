@@ -19,6 +19,20 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _activeWindowTitleTooltip, value);
         }
 
+        private ImageSource _activeWindowIcon;
+        public ImageSource ActiveWindowIcon
+        {
+            get => _activeWindowIcon;
+            set => SetProperty(ref _activeWindowIcon, value);
+        }
+
+        private Visibility _activeWindowIconVisibility = Visibility.Collapsed;
+        public Visibility ActiveWindowIconVisibility
+        {
+            get => _activeWindowIconVisibility;
+            set => SetProperty(ref _activeWindowIconVisibility, value);
+        }
+
         private string _clockText = "";
         public string ClockText
         {

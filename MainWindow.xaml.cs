@@ -11,6 +11,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
+using System.Runtime.InteropServices.WindowsRuntime;
 using MenuBar.Services;
 using MenuBar.ViewModels;
 using WinRT.Interop;
@@ -40,6 +42,8 @@ namespace MenuBar
             new SolidColorBrush(Microsoft.UI.Colors.White);
         private readonly SolidColorBrush _batteryChargingBrush =
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
+        private readonly SolidColorBrush _batteryPluggedBrush =
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x00, 0xB7, 0xC3));
         private readonly SolidColorBrush _batterySaverBrush =
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0xEA, 0xA3, 0x00));
 
@@ -58,6 +62,8 @@ namespace MenuBar
         private NativeMethods.WinEventDelegate _foregroundDelegate;
         private NativeMethods.WinEventDelegate _titleChangeDelegate;
         private bool _appBarRegistered;
+        private IntPtr _lastForegroundHwnd = IntPtr.Zero;
+        private IntPtr _lastExternalForegroundHwnd;
         private MenuBarSettings _settings = MenuBarSettings.CreateDefault();
         private readonly Windows.UI.ViewManagement.UISettings _uiSettings = new();
         private HardwareService.BatteryInfo _batteryInfo = new HardwareService.BatteryInfo();
@@ -111,6 +117,7 @@ namespace MenuBar
             }
 
             int exStyle = NativeMethods.GetWindowLong(_hwnd, NativeMethods.GWL_EXSTYLE);
+            // Keep the bar out of Alt-Tab while still behaving like a normal top-docked AppBar.
             exStyle = (exStyle | NativeMethods.WS_EX_TOOLWINDOW) & ~NativeMethods.WS_EX_APPWINDOW;
             NativeMethods.SetWindowLong(_hwnd, NativeMethods.GWL_EXSTYLE, exStyle);
 
@@ -203,6 +210,8 @@ namespace MenuBar
         private void OnForegroundEvent(IntPtr hook, uint eventType, IntPtr hwnd,
             int idObject, int idChild, uint threadId, uint time)
         {
+            if (hwnd != IntPtr.Zero && hwnd != _hwnd)
+                _lastExternalForegroundHwnd = hwnd;
             UpdateActiveWindow();
         }
 
@@ -325,6 +334,102 @@ namespace MenuBar
 
             ViewModel.ActiveWindowTitle = title;
             ViewModel.ActiveWindowTitleTooltip = title;
+
+            // Only re-fetch icon when the foreground window itself changes, not on title-only updates.
+            // This avoids GDI allocation on every browser tab title change, etc.
+            if (foreground != _lastForegroundHwnd)
+            {
+                _lastForegroundHwnd = foreground;
+                ImageSource icon = GetWindowIconBitmap(foreground);
+                ViewModel.ActiveWindowIcon = icon;
+                ViewModel.ActiveWindowIconVisibility = icon != null ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private static ImageSource GetWindowIconBitmap(IntPtr hwnd)
+        {
+            IntPtr hIcon = NativeMethods.SendMessage(hwnd, NativeMethods.WM_GETICON, NativeMethods.ICON_SMALL2, 0);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.SendMessage(hwnd, NativeMethods.WM_GETICON, NativeMethods.ICON_SMALL, 0);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.SendMessage(hwnd, NativeMethods.WM_GETICON, NativeMethods.ICON_BIG, 0);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.GetClassLongPtr(hwnd, NativeMethods.GCLP_HICONSM);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.GetClassLongPtr(hwnd, NativeMethods.GCLP_HICON);
+            if (hIcon == IntPtr.Zero)
+                return null;
+
+            return HIconToWriteableBitmap(hIcon);
+        }
+
+        private static WriteableBitmap HIconToWriteableBitmap(IntPtr hIcon)
+        {
+            int size = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXSMICON);
+            if (size <= 0) size = 16;
+
+            var bmi = new NativeMethods.BITMAPINFOHEADER
+            {
+                biSize = Marshal.SizeOf<NativeMethods.BITMAPINFOHEADER>(),
+                biWidth = size,
+                biHeight = -size,   // negative = top-down scan order
+                biPlanes = 1,
+                biBitCount = 32,
+                biCompression = 0   // BI_RGB
+            };
+
+            IntPtr hdc = NativeMethods.CreateCompatibleDC(IntPtr.Zero);
+            if (hdc == IntPtr.Zero) return null;
+
+            IntPtr hBitmap = NativeMethods.CreateDIBSection(
+                hdc, ref bmi, NativeMethods.DIB_RGB_COLORS,
+                out IntPtr ppvBits, IntPtr.Zero, 0);
+            if (hBitmap == IntPtr.Zero)
+            {
+                NativeMethods.DeleteDC(hdc);
+                return null;
+            }
+
+            IntPtr oldBitmap = NativeMethods.SelectObject(hdc, hBitmap);
+            NativeMethods.DrawIconEx(hdc, 0, 0, hIcon, size, size, 0, IntPtr.Zero, NativeMethods.DI_NORMAL);
+            NativeMethods.SelectObject(hdc, oldBitmap);
+
+            byte[] pixels = new byte[size * size * 4];
+            Marshal.Copy(ppvBits, pixels, 0, pixels.Length);
+
+            NativeMethods.DeleteObject(hBitmap);
+            NativeMethods.DeleteDC(hdc);
+
+            // Legacy icons have no alpha channel — synthesize opacity from color data
+            bool hasAlpha = false;
+            for (int i = 3; i < pixels.Length; i += 4)
+            {
+                if (pixels[i] != 0) { hasAlpha = true; break; }
+            }
+            if (!hasAlpha)
+            {
+                for (int i = 0; i < pixels.Length; i += 4)
+                {
+                    if (pixels[i] != 0 || pixels[i + 1] != 0 || pixels[i + 2] != 0)
+                        pixels[i + 3] = 255;
+                }
+            }
+
+            // WriteableBitmap.PixelBuffer expects premultiplied BGRA8
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                byte a = pixels[i + 3];
+                if (a == 0 || a == 255) continue;
+                pixels[i]     = (byte)(pixels[i]     * a / 255);
+                pixels[i + 1] = (byte)(pixels[i + 1] * a / 255);
+                pixels[i + 2] = (byte)(pixels[i + 2] * a / 255);
+            }
+
+            var wb = new WriteableBitmap(size, size);
+            using (var stream = wb.PixelBuffer.AsStream())
+                stream.Write(pixels, 0, pixels.Length);
+            wb.Invalidate();
+            return wb;
         }
 
         private void UpdateBattery()
@@ -341,10 +446,6 @@ namespace MenuBar
                     ? Visibility.Collapsed
                     : Visibility.Visible;
 
-                BatteryBoltPath.Visibility = _batteryInfo.Charging
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-
                 string status = _batteryInfo.Charging
                     ? "Charging"
                     : (_batteryInfo.PluggedIn ? "Plugged in, fully charged" : "On battery");
@@ -357,7 +458,6 @@ namespace MenuBar
                 ViewModel.BatteryTooltip = "Battery: AC power";
                 BatteryFillGlyphText.Foreground = _batteryDefaultBrush;
                 BatteryOutlineGlyphText.Visibility = Visibility.Collapsed;
-                BatteryBoltPath.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -419,27 +519,32 @@ namespace MenuBar
         {
             if (!_batteryInfo.HasBattery)
             {
-                BatteryMenuPrimaryItem.Text = "AC power \u2014 no battery detected";
-                BatteryMenuSecondaryItem.Visibility = Visibility.Collapsed;
-                BatteryMenuTimeItem.Visibility = Visibility.Collapsed;
+                BatteryFlyoutPercent.Text = "AC Power";
+                BatteryFlyoutStatus.Text = "No battery detected";
+                BatteryFlyoutIcon.Text = "\uEC02";
+                BatteryFlyoutIcon.Foreground = _batteryDefaultBrush;
+                BatteryFlyoutTime.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            BatteryMenuPrimaryItem.Text = $"{_batteryInfo.Percent}%";
-            BatteryMenuSecondaryItem.Text = _batteryInfo.Charging
-                ? "Charging..."
-                : (_batteryInfo.PluggedIn ? "Plugged in, fully charged" : "On battery power");
-            BatteryMenuSecondaryItem.Visibility = Visibility.Visible;
+            BatteryFlyoutPercent.Text = $"{_batteryInfo.Percent}%";
+            BatteryFlyoutStatus.Text = _batteryInfo.Charging
+                ? "Charging"
+                : (_batteryInfo.PluggedIn
+                    ? (_batteryInfo.Percent >= 99 ? "Plugged in, fully charged" : "Smart charging")
+                    : "On battery power");
+            BatteryFlyoutIcon.Text = GetBatteryFillGlyph(_batteryInfo.Percent);
+            BatteryFlyoutIcon.Foreground = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn);
 
             string remaining = FormatRemainingTime(_batteryInfo.SecondsRemaining);
             if (string.IsNullOrWhiteSpace(remaining))
             {
-                BatteryMenuTimeItem.Visibility = Visibility.Collapsed;
+                BatteryFlyoutTime.Visibility = Visibility.Collapsed;
             }
             else
             {
-                BatteryMenuTimeItem.Text = $"Time remaining: {remaining}";
-                BatteryMenuTimeItem.Visibility = Visibility.Visible;
+                BatteryFlyoutTime.Text = remaining;
+                BatteryFlyoutTime.Visibility = Visibility.Visible;
             }
         }
 
@@ -447,34 +552,42 @@ namespace MenuBar
         {
             if (!_networkInfo.Connected)
             {
-                NetworkMenuPrimaryItem.Text = "Not connected";
-                NetworkMenuSecondaryItem.Visibility = Visibility.Collapsed;
-                NetworkMenuDownItem.Visibility = Visibility.Collapsed;
-                NetworkMenuUpItem.Visibility = Visibility.Collapsed;
+                NetworkFlyoutIcon.Text = "\uEB55";
+                NetworkFlyoutName.Text = "Not connected";
+                NetworkFlyoutStatus.Text = "No internet access";
+                NetworkFlyoutSpeed.Visibility = Visibility.Collapsed;
                 return;
             }
 
             if (_networkInfo.IsWifi)
             {
+                NetworkFlyoutIcon.Text = "\uE701";
                 string ssid = string.IsNullOrWhiteSpace(_networkInfo.Ssid) ? "Wi-Fi" : _networkInfo.Ssid;
-                NetworkMenuPrimaryItem.Text = ssid;
-                NetworkMenuSecondaryItem.Text = _networkInfo.SignalLevel switch
+                NetworkFlyoutName.Text = ssid;
+                NetworkFlyoutStatus.Text = _networkInfo.SignalLevel switch
                 {
-                    1 => "Wi-Fi  \u00b7  Weak",
-                    2 => "Wi-Fi  \u00b7  Fair",
-                    3 => "Wi-Fi  \u00b7  Strong",
+                    1 => "Wi-Fi  \u00b7  Weak signal",
+                    2 => "Wi-Fi  \u00b7  Fair signal",
+                    3 => "Wi-Fi  \u00b7  Strong signal",
                     _ => "Wi-Fi"
                 };
             }
             else
             {
-                NetworkMenuPrimaryItem.Text = "Ethernet";
-                NetworkMenuSecondaryItem.Text = "Connected";
+                NetworkFlyoutIcon.Text = "\uE839";
+                NetworkFlyoutName.Text = "Ethernet";
+                NetworkFlyoutStatus.Text = "Connected";
             }
 
-            NetworkMenuSecondaryItem.Visibility = Visibility.Visible;
-            SetSpeedMenuItem(NetworkMenuDownItem, "Link speed (\u2193)", _networkInfo.ReceiveRateMbps);
-            SetSpeedMenuItem(NetworkMenuUpItem, "Link speed (\u2191)", _networkInfo.TransmitRateMbps, _networkInfo.ReceiveRateMbps);
+            if (_networkInfo.ReceiveRateMbps.HasValue)
+            {
+                NetworkFlyoutSpeed.Text = $"Link speed: {_networkInfo.ReceiveRateMbps.Value} Mbps";
+                NetworkFlyoutSpeed.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                NetworkFlyoutSpeed.Visibility = Visibility.Collapsed;
+            }
         }
 
         #endregion
@@ -505,7 +618,26 @@ namespace MenuBar
 
         private void ClockHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
+            // PointerPressed is too late here; WinUI has already triggered the window activation/focus change.
+            if (IsShellExperienceHostWindow(_lastExternalForegroundHwnd))
+            {
+                _lastExternalForegroundHwnd = IntPtr.Zero;
+                return;
+            }
             SendKeyChord(NativeMethods.VK_LWIN, NativeMethods.VK_N);
+        }
+
+        private static bool IsShellExperienceHostWindow(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero) return false;
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            try
+            {
+                // ShellExperienceHost is the notification center host on Windows 11; class names are not reliable.
+                return Process.GetProcessById((int)pid).ProcessName
+                    .Equals("ShellExperienceHost", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
         }
 
         private void OpenSettingsFile_Click(object sender, RoutedEventArgs e)
@@ -582,6 +714,7 @@ namespace MenuBar
 
         private void Host_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+            // Visual feedback only; do not use this for clock state detection.
             if (sender is Border border)
             {
                 border.Background = _pressedBrush;
@@ -639,24 +772,9 @@ namespace MenuBar
 
         private SolidColorBrush GetBatteryFillBrush(int percent, bool charging, bool pluggedIn)
         {
-            if (charging || pluggedIn)
-            {
-                return _batteryChargingBrush;
-            }
-
+            if (charging) return _batteryChargingBrush;
+            if (pluggedIn) return _batteryPluggedBrush;
             return percent <= 20 ? _batterySaverBrush : _batteryDefaultBrush;
-        }
-
-        private static void SetSpeedMenuItem(MenuFlyoutItem item, string label, int? speed, int? compareWith = null)
-        {
-            if (!speed.HasValue || (compareWith.HasValue && compareWith.Value == speed.Value))
-            {
-                item.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            item.Text = $"{label}: {speed.Value} Mbps";
-            item.Visibility = Visibility.Visible;
         }
 
         private static void ToggleAttachedFlyout(FrameworkElement element)

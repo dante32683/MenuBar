@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
+using Windows.Devices.Power;
 using Windows.Networking.Connectivity;
+using Windows.System.Power;
 
 namespace MenuBar.Services
 {
@@ -43,7 +45,12 @@ namespace MenuBar.Services
 
                     info.PluggedIn = status.ACLineStatus == 1;
                     info.Percent = status.BatteryLifePercent == byte.MaxValue ? 0 : status.BatteryLifePercent;
-                    info.Charging = info.PluggedIn && (status.BatteryFlag & 8) != 0;
+                    var batteryReport = Battery.AggregateBattery.GetReport();
+                    // Lenovo conservation mode keeps Status=Charging but ChargeRateInMilliwatts=0.
+                    // Use actual current flow as ground truth when available; fall back to status flag otherwise.
+                    info.Charging = batteryReport.ChargeRateInMilliwatts.HasValue
+                        ? batteryReport.ChargeRateInMilliwatts.Value > 0
+                        : batteryReport.Status == BatteryStatus.Charging;
                     if (status.BatteryLifeTime != uint.MaxValue)
                     {
                         info.SecondsRemaining = (int)status.BatteryLifeTime;
