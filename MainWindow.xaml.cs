@@ -25,6 +25,7 @@ namespace MenuBar
             public string Title { get; set; } = string.Empty;
             public string Artist { get; set; } = string.Empty;
             public bool Playing { get; set; }
+            public Microsoft.UI.Xaml.Media.ImageSource AlbumCover { get; set; }
 
             public bool HasContent =>
                 !string.IsNullOrWhiteSpace(Title) || !string.IsNullOrWhiteSpace(Artist);
@@ -304,12 +305,31 @@ namespace MenuBar
             {
                 var props = await session.TryGetMediaPropertiesAsync();
                 var playback = session.GetPlaybackInfo();
-                _mediaState = new MediaState
+                var state = new MediaState
                 {
                     Title = props?.Title ?? string.Empty,
                     Artist = props?.Artist ?? string.Empty,
                     Playing = playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
                 };
+                
+                if (props?.Thumbnail != null)
+                {
+                    try
+                    {
+                        var stream = await props.Thumbnail.OpenReadAsync();
+                        if (stream != null)
+                        {
+                            var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                            await bitmap.SetSourceAsync(stream);
+                            state.AlbumCover = bitmap;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                
+                _mediaState = state;
             }
             catch
             {
@@ -328,6 +348,11 @@ namespace MenuBar
                 ViewModel.MediaTooltip = display;
                 ViewModel.MediaIndicatorBrush = _mediaState.Playing ? _mediaPlayingBrush : _mediaPausedBrush;
                 ViewModel.MediaVisibility = Visibility.Visible;
+                
+                ViewModel.MediaTitle = _mediaState.Title;
+                ViewModel.MediaArtist = _mediaState.Artist;
+                ViewModel.MediaAlbumCover = _mediaState.AlbumCover;
+                ViewModel.MediaPlayPauseSymbol = _mediaState.Playing ? Symbol.Pause : Symbol.Play;
             }
             else
             {
@@ -335,6 +360,11 @@ namespace MenuBar
                 ViewModel.MediaTooltip = string.Empty;
                 ViewModel.MediaIndicatorBrush = _mediaInactiveBrush;
                 ViewModel.MediaVisibility = Visibility.Collapsed;
+                
+                ViewModel.MediaTitle = "Nothing playing";
+                ViewModel.MediaArtist = string.Empty;
+                ViewModel.MediaAlbumCover = null;
+                ViewModel.MediaPlayPauseSymbol = Symbol.Play;
             }
         }
 
@@ -504,30 +534,6 @@ namespace MenuBar
             item.Visibility = Visibility.Visible;
         }
 
-        private void UpdateMediaFlyout()
-        {
-            if (!_mediaState.HasContent)
-            {
-                MediaMenuTitleItem.Text = "Nothing playing";
-                MediaMenuArtistItem.Visibility = Visibility.Collapsed;
-                MediaMenuPlayPauseItem.Text = "Play / Pause";
-                return;
-            }
-
-            MediaMenuTitleItem.Text = string.IsNullOrWhiteSpace(_mediaState.Title) ? _mediaState.Artist : _mediaState.Title;
-            if (!string.IsNullOrWhiteSpace(_mediaState.Artist) && _mediaState.Title != _mediaState.Artist)
-            {
-                MediaMenuArtistItem.Text = _mediaState.Artist;
-                MediaMenuArtistItem.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                MediaMenuArtistItem.Visibility = Visibility.Collapsed;
-            }
-
-            MediaMenuPlayPauseItem.Text = _mediaState.Playing ? "Pause" : "Play";
-        }
-
         private static void ToggleAttachedFlyout(FrameworkElement element)
         {
             FlyoutBase flyout = FlyoutBase.GetAttachedFlyout(element);
@@ -552,7 +558,6 @@ namespace MenuBar
 
         private void MediaHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            UpdateMediaFlyout();
             ToggleAttachedFlyout((FrameworkElement)sender);
         }
 
@@ -624,7 +629,6 @@ namespace MenuBar
             SendKey(NativeMethods.VK_MEDIA_PLAY_PAUSE);
             _mediaState.Playing = !_mediaState.Playing;
             ApplyMediaState();
-            UpdateMediaFlyout();
         }
 
         private void Host_PointerEntered(object sender, PointerRoutedEventArgs e)

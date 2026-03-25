@@ -104,6 +104,34 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _mediaTooltip, value);
         }
 
+        private string _mediaTitle = "";
+        public string MediaTitle
+        {
+            get => _mediaTitle;
+            set => SetProperty(ref _mediaTitle, value);
+        }
+
+        private string _mediaArtist = "";
+        public string MediaArtist
+        {
+            get => _mediaArtist;
+            set => SetProperty(ref _mediaArtist, value);
+        }
+
+        private ImageSource _mediaAlbumCover;
+        public ImageSource MediaAlbumCover
+        {
+            get => _mediaAlbumCover;
+            set => SetProperty(ref _mediaAlbumCover, value);
+        }
+
+        private Microsoft.UI.Xaml.Controls.Symbol _mediaPlayPauseSymbol = Microsoft.UI.Xaml.Controls.Symbol.Play;
+        public Microsoft.UI.Xaml.Controls.Symbol MediaPlayPauseSymbol
+        {
+            get => _mediaPlayPauseSymbol;
+            set => SetProperty(ref _mediaPlayPauseSymbol, value);
+        }
+
         private Brush _mediaIndicatorBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         public Brush MediaIndicatorBrush
         {

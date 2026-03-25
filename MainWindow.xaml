@@ -100,14 +100,68 @@
                             <ToolTip Content="{x:Bind ViewModel.MediaTooltip, Mode=OneWay}" />
                         </ToolTipService.ToolTip>
                         <FlyoutBase.AttachedFlyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuFlyoutItem x:Name="MediaMenuTitleItem" Text="Nothing playing" />
-                                <MenuFlyoutItem x:Name="MediaMenuArtistItem" Text="" Visibility="Collapsed" />
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutItem Text="Previous" Click="MediaPrevious_Click" />
-                                <MenuFlyoutItem x:Name="MediaMenuPlayPauseItem" Text="Play / Pause" Click="MediaPlayPause_Click" />
-                                <MenuFlyoutItem Text="Next" Click="MediaNext_Click" />
-                            </MenuFlyout>
+                            <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
+                                <Flyout.FlyoutPresenterStyle>
+                                    <Style TargetType="FlyoutPresenter">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="MinWidth" Value="300" />
+                                    </Style>
+                                </Flyout.FlyoutPresenterStyle>
+                                <Grid Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                      CornerRadius="8"
+                                      Padding="16"
+                                      MinWidth="300">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <Border Width="80" Height="80" CornerRadius="4" Background="{ThemeResource ControlAltFillColorQuarternaryBrush}">
+                                            <Image Source="{x:Bind ViewModel.MediaAlbumCover, Mode=OneWay}" Stretch="UniformToFill" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock Text="{x:Bind ViewModel.MediaTitle, Mode=OneWay}" 
+                                                       FontWeight="SemiBold" 
+                                                       FontSize="16" 
+                                                       TextTrimming="CharacterEllipsis" 
+                                                       MaxWidth="180" />
+                                            <TextBlock Text="{x:Bind ViewModel.MediaArtist, Mode=OneWay}" 
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" 
+                                                       FontSize="14" 
+                                                       TextTrimming="CharacterEllipsis" 
+                                                       MaxWidth="180" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="1" 
+                                                Orientation="Horizontal" 
+                                                HorizontalAlignment="Center" 
+                                                Spacing="24" 
+                                                Margin="0,16,0,0">
+                                        <Button Click="MediaPrevious_Click" 
+                                                Background="Transparent" 
+                                                BorderThickness="0" 
+                                                Padding="8">
+                                            <SymbolIcon Symbol="Back" />
+                                        </Button>
+                                        <Button Click="MediaPlayPause_Click" 
+                                                Background="{ThemeResource AccentFillColorDefaultBrush}" 
+                                                Foreground="White"
+                                                Width="48" Height="48" 
+                                                CornerRadius="24" 
+                                                Padding="0">
+                                            <SymbolIcon Symbol="{x:Bind ViewModel.MediaPlayPauseSymbol, Mode=OneWay}" />
+                                        </Button>
+                                        <Button Click="MediaNext_Click" 
+                                                Background="Transparent" 
+                                                BorderThickness="0" 
+                                                Padding="8">
+                                            <SymbolIcon Symbol="Forward" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Flyout>
                         </FlyoutBase.AttachedFlyout>
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
@@ -195,8 +249,9 @@
                                       Fill="White"
                                       Data="M 8,0 L 4.8,4.8 H 7.1 L 5.8,10 L 10,4.4 H 7.7 Z"
                                       Stretch="Uniform"
-                                      Width="6.4"
-                                      Height="8.53" />
+                                      Width="10"
+                                      Height="12"
+                                      Margin="0,-4,0,0" />
                             </Grid>
                             <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}" 
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}" 
