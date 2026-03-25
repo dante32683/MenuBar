@@ -34,6 +34,27 @@ namespace MenuBar.Services
         [JsonPropertyName("show_windows_logo")]
         public bool ShowWindowsLogo { get; set; } = false;
 
+        [JsonPropertyName("title_max_length")]
+        public int TitleMaxLength { get; set; } = 0;
+
+        [JsonPropertyName("media_max_length")]
+        public int MediaMaxLength { get; set; } = 0;
+
+        [JsonPropertyName("clock_show_seconds")]
+        public bool ClockShowSeconds { get; set; } = false;
+
+        [JsonPropertyName("clock_show_date")]
+        public bool ClockShowDate { get; set; } = true;
+
+        [JsonPropertyName("clock_date_format")]
+        public string ClockDateFormat { get; set; } = "MM/dd/yyyy";
+
+        [JsonPropertyName("font_size_text")]
+        public double FontSizeText { get; set; } = 0;
+
+        [JsonPropertyName("font_size_icon")]
+        public double FontSizeIcon { get; set; } = 0;
+
         public static MenuBarSettings CreateDefault()
         {
             return new MenuBarSettings();
@@ -47,6 +68,8 @@ namespace MenuBar.Services
         public void Normalize()
         {
             BarHeight = GetEffectiveBarHeight();
+            if (string.IsNullOrWhiteSpace(ClockDateFormat))
+                ClockDateFormat = "MM/dd/yyyy";
         }
     }
 

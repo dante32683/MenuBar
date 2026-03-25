@@ -192,7 +192,7 @@
                                                 Margin="0,16,0,0">
                                         <Button Click="MediaPrevious_Click"
                                                 Style="{StaticResource MediaTransportButtonStyle}">
-                                            <SymbolIcon Symbol="Back" />
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE892;" FontSize="16" />
                                         </Button>
                                         <Button Click="MediaPlayPause_Click"
                                                 Style="{StaticResource AccentButtonStyle}"
@@ -203,7 +203,7 @@
                                         </Button>
                                         <Button Click="MediaNext_Click"
                                                 Style="{StaticResource MediaTransportButtonStyle}">
-                                            <SymbolIcon Symbol="Forward" />
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE893;" FontSize="16" />
                                         </Button>
                                     </StackPanel>
                                 </Grid>

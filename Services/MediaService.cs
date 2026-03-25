@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media;
@@ -56,7 +57,48 @@ namespace MenuBar.Services
         {
             _dispatcher.TryEnqueue(() =>
             {
-                AttachSession(sender.GetCurrentSession());
+                var newSession = sender.GetCurrentSession();
+
+                // If the new OS-current session is actively Playing, follow it immediately.
+                if (newSession != null)
+                {
+                    try
+                    {
+                        var status = newSession.GetPlaybackInfo()?.PlaybackStatus;
+                        if (status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
+                        {
+                            AttachSession(newSession);
+                            _ = RefreshAsync();
+                            return;
+                        }
+                    }
+                    catch { }
+                }
+
+                // New OS-current is not Playing. Preserve our current session if it is
+                // still alive in GetSessions() and has Paused status (e.g. Spotify paused
+                // → don't hand control to Google Meet).
+                if (_currentSession != null)
+                {
+                    try
+                    {
+                        bool stillAlive = sender.GetSessions()
+                            .Any(s => s.SourceAppUserModelId == _currentSession.SourceAppUserModelId);
+                        if (stillAlive)
+                        {
+                            var st = _currentSession.GetPlaybackInfo()?.PlaybackStatus;
+                            if (st == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused)
+                            {
+                                _ = RefreshAsync();
+                                return;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // Fallback: take whatever Windows says is current.
+                AttachSession(newSession);
                 _ = RefreshAsync();
             });
         }

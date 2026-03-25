@@ -284,8 +284,8 @@ namespace MenuBar
             ViewModel.LogoTooltip = "Power and system menu";
 
             int barHeight = _settings.GetEffectiveBarHeight();
-            ViewModel.IconFontSize = barHeight * 0.62;
-            ViewModel.TextFontSize = barHeight * 0.44;
+            ViewModel.IconFontSize = _settings.FontSizeIcon > 0 ? _settings.FontSizeIcon : barHeight * 0.62;
+            ViewModel.TextFontSize = _settings.FontSizeText > 0 ? _settings.FontSizeText : barHeight * 0.44;
 
             ApplyMediaState(_mediaService?.CurrentState ?? MediaService.MediaState.Empty);
             ApplyBackgroundColor();
@@ -298,22 +298,29 @@ namespace MenuBar
         private void UpdateClock()
         {
             DateTime now = DateTime.Now;
-            if (_settings.Clock24h)
+            string timeFmt = _settings.Clock24h
+                ? (_settings.ClockShowSeconds ? "HH:mm:ss" : "HH:mm")
+                : (_settings.ClockShowSeconds ? "h:mm:ss tt" : "h:mm tt");
+
+            string clockText;
+            if (_settings.ClockShowDate)
             {
-                ViewModel.ClockText = now.ToString("MM/dd/yyyy  HH:mm");
+                try
+                {
+                    clockText = now.ToString(_settings.ClockDateFormat + "  " + timeFmt);
+                }
+                catch
+                {
+                    clockText = now.ToString("MM/dd/yyyy  " + timeFmt);
+                }
             }
             else
             {
-                string hour = now.ToString("hh").TrimStart('0');
-                if (string.IsNullOrEmpty(hour))
-                {
-                    hour = "12";
-                }
-
-                ViewModel.ClockText = now.ToString($"MM/dd/yyyy  {hour}:mm tt");
+                clockText = now.ToString(timeFmt);
             }
 
-            ViewModel.ClockTooltip = now.ToString("dddd, MMMM dd, yyyy hh:mm:ss tt");
+            ViewModel.ClockText = clockText;
+            ViewModel.ClockTooltip = now.ToString("dddd, MMMM dd, yyyy h:mm:ss tt");
         }
 
         private void UpdateActiveWindow()
@@ -332,8 +339,10 @@ namespace MenuBar
                 title = "Desktop";
             }
 
-            ViewModel.ActiveWindowTitle = title;
             ViewModel.ActiveWindowTitleTooltip = title;
+            if (_settings.TitleMaxLength > 0 && title.Length > _settings.TitleMaxLength)
+                title = title[.._settings.TitleMaxLength] + "\u2026";
+            ViewModel.ActiveWindowTitle = title;
 
             // Only re-fetch icon when the foreground window itself changes, not on title-only updates.
             // This avoids GDI allocation on every browser tab title change, etc.
@@ -487,8 +496,10 @@ namespace MenuBar
             if (_settings.ShowMedia && state.HasContent)
             {
                 string display = BuildMediaDisplay(state);
-                ViewModel.MediaText = display;
                 ViewModel.MediaTooltip = display;
+                if (_settings.MediaMaxLength > 0 && display.Length > _settings.MediaMaxLength)
+                    display = display[.._settings.MediaMaxLength] + "\u2026";
+                ViewModel.MediaText = display;
                 ViewModel.MediaIndicatorBrush = state.Playing ? _mediaPlayingBrush : _mediaPausedBrush;
                 ViewModel.MediaVisibility = Visibility.Visible;
 
@@ -774,6 +785,8 @@ namespace MenuBar
         {
             if (charging) return _batteryChargingBrush;
             if (pluggedIn) return _batteryPluggedBrush;
+            if (Windows.System.Power.PowerManager.EnergySaverStatus == Windows.System.Power.EnergySaverStatus.On)
+                return _batterySaverBrush;
             return percent <= 20 ? _batterySaverBrush : _batteryDefaultBrush;
         }
 

@@ -1,4 +1,23 @@
 {
+  "_help": {
+    "bar_height":         "Bar height in pixels. Range: 28–56. Font sizes scale automatically unless overridden.",
+    "show_battery":       "Show the battery icon and percentage. Set false to hide on desktop PCs.",
+    "show_network":       "Show the Wi-Fi / Ethernet icon.",
+    "show_clock":         "Show the clock / date widget.",
+    "show_media":         "Show the media widget when something is playing. Auto-hides when nothing is playing.",
+    "show_title":         "Show the active window title on the left side.",
+    "show_windows_logo":  "Show the Windows logo button (power menu: sleep, restart, shut down).",
+    "clock_24h":          "Use 24-hour time (true) or 12-hour with AM/PM (false).",
+    "clock_show_seconds": "Include seconds in the clock display.",
+    "clock_show_date":    "Include the date alongside the time.",
+    "clock_date_format":  "Date format string (C# DateTime). Examples: 'MM/dd/yyyy', 'dd/MM/yyyy', 'ddd MMM d', 'yyyy-MM-dd'.",
+    "use_accent_color":   "Tint the bar background with your Windows accent color. false = dark grey.",
+    "title_max_length":   "Hard-truncate the window title at N characters (appends …). 0 = no limit.",
+    "media_max_length":   "Hard-truncate the media bar text at N characters (appends …). 0 = no limit.",
+    "font_size_text":     "Override text font size in pixels (battery %, time, title). 0 = auto-scale from bar_height.",
+    "font_size_icon":     "Override icon font size in pixels (battery, network glyphs). 0 = auto-scale from bar_height."
+  },
+
   "bar_height": 28,
   "show_battery": true,
   "show_network": true,
@@ -7,5 +26,12 @@
   "show_title": true,
   "clock_24h": false,
   "use_accent_color": true,
-  "show_windows_logo": false
+  "show_windows_logo": false,
+  "title_max_length": 0,
+  "media_max_length": 0,
+  "clock_show_seconds": false,
+  "clock_show_date": true,
+  "clock_date_format": "MM/dd/yyyy",
+  "font_size_text": 0,
+  "font_size_icon": 0
 }
