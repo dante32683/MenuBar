@@ -229,7 +229,7 @@ namespace MenuBar.Services
         public static extern bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon,
             int cxWidth, int cyWidth, int istepIfAniCur, IntPtr hbrFlickerFreeDraw, int diFlags);
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        [StructLayout(LayoutKind.Sequential)]
         public struct MENUITEMINFO
         {
             public uint   cbSize;
@@ -241,8 +241,7 @@ namespace MenuBar.Services
             public IntPtr hbmpChecked;
             public IntPtr hbmpUnchecked;
             public IntPtr dwItemData;
-            [MarshalAs(UnmanagedType.LPWStr)]
-            public string dwTypeData;
+            public IntPtr dwTypeData;   // caller-allocated LPWSTR buffer; read back with Marshal.PtrToStringUni
             public uint   cch;
             public IntPtr hbmpItem;
         }
@@ -256,7 +255,7 @@ namespace MenuBar.Services
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetMenuItemInfo(IntPtr hMenu, uint uItem,
-            [MarshalAs(UnmanagedType.Bool)] bool fByPosition, ref MENUITEMINFO lpmii);
+            bool fByPosition, ref MENUITEMINFO lpmii);
 
         [DllImport("user32.dll")]
         public static extern int TrackPopupMenu(IntPtr hMenu, uint uFlags,

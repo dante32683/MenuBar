@@ -330,8 +330,9 @@ namespace MenuBar
 
             if (_settings.ShowAppMenu)
             {
-                _appMenuTargetHwnd = IntPtr.Zero; // force rebuild with new font size
-                RefreshAppMenu();
+                _appMenuTargetHwnd = IntPtr.Zero;  // force rebuild with new font size
+                _lastForegroundHwnd = IntPtr.Zero; // force UpdateActiveWindow to call RefreshAppMenu
+                RefreshAppMenu();                  // also try now in case a non-bar window is focused
             }
             else
             {
@@ -598,60 +599,75 @@ namespace MenuBar
 
             double fontSize = ViewModel.TextFontSize;
 
-            for (uint i = 0; i < (uint)count; i++)
+            // Allocate a single native buffer for all GetMenuItemInfo calls in this loop.
+            // Using IntPtr avoids relying on the managed-string P/Invoke marshaling path,
+            // which does not reliably round-trip the written text back into mii.dwTypeData.
+            const int bufChars = 256;
+            IntPtr textBuf = Marshal.AllocHGlobal(bufChars * 2); // UTF-16, 2 bytes per char
+            try
             {
-                var mii = new NativeMethods.MENUITEMINFO
+                for (uint i = 0; i < (uint)count; i++)
                 {
-                    cbSize = (uint)Marshal.SizeOf<NativeMethods.MENUITEMINFO>(),
-                    fMask = NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE |
-                            NativeMethods.MIIM_STRING | NativeMethods.MIIM_SUBMENU,
-                    dwTypeData = new string('\0', 256),
-                    cch = 256
-                };
+                    // Zero the buffer so PtrToStringUni gets a clean null-terminated string
+                    // even if GetMenuItemInfo writes fewer characters than expected.
+                    Marshal.WriteInt16(textBuf, 0);
 
-                if (!NativeMethods.GetMenuItemInfo(hMenu, i, true, ref mii)) continue;
-                if ((mii.fType & NativeMethods.MFT_SEPARATOR) != 0) continue;
-                if ((mii.fType & NativeMethods.MFT_BITMAP) != 0) continue;
+                    var mii = new NativeMethods.MENUITEMINFO
+                    {
+                        cbSize = (uint)Marshal.SizeOf<NativeMethods.MENUITEMINFO>(),
+                        fMask = NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE |
+                                NativeMethods.MIIM_STRING | NativeMethods.MIIM_SUBMENU,
+                        dwTypeData = textBuf,
+                        cch = bufChars - 1  // leave room for null terminator
+                    };
 
-                string label = mii.dwTypeData?.Split('\t')[0].Replace("&", string.Empty).TrimEnd('\0')
-                               ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(label)) continue;
+                    if (!NativeMethods.GetMenuItemInfo(hMenu, i, true, ref mii)) continue;
+                    if ((mii.fType & NativeMethods.MFT_SEPARATOR) != 0) continue;
+                    if ((mii.fType & NativeMethods.MFT_BITMAP) != 0) continue;
 
-                bool grayed = (mii.fState & NativeMethods.MFS_GRAYED) != 0;
-                IntPtr subMenu = mii.hSubMenu;
-                IntPtr targetHwnd = hwnd;
+                    string raw = Marshal.PtrToStringUni(textBuf) ?? string.Empty;
+                    string label = raw.Split('\t')[0].Replace("&", string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(label)) continue;
 
-                var textBlock = new TextBlock
-                {
-                    Text = label,
-                    FontFamily = new FontFamily("Segoe UI Variable"),
-                    FontSize = fontSize,
-                    Foreground = grayed
-                        ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 120, 120, 120))
-                        : new SolidColorBrush(Microsoft.UI.Colors.White),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
+                    bool grayed = (mii.fState & NativeMethods.MFS_GRAYED) != 0;
+                    IntPtr subMenu = mii.hSubMenu;
 
-                var border = new Border
-                {
-                    Background = _transparentBrush,
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(8, 0, 8, 0),
-                    VerticalAlignment = VerticalAlignment.Stretch,
-                    Tag = new AppMenuItem { Index = i, TargetHwnd = targetHwnd, SubMenuHandle = subMenu },
-                    Child = textBlock
-                };
+                    var textBlock = new TextBlock
+                    {
+                        Text = label,
+                        FontFamily = new FontFamily("Segoe UI Variable"),
+                        FontSize = fontSize,
+                        Foreground = grayed
+                            ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 120, 120, 120))
+                            : new SolidColorBrush(Microsoft.UI.Colors.White),
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
 
-                if (!grayed)
-                {
-                    border.PointerEntered += Host_PointerEntered;
-                    border.PointerExited += Host_PointerExited;
-                    border.PointerPressed += Host_PointerPressed;
-                    border.PointerReleased += Host_PointerReleased;
-                    border.Tapped += AppMenuItem_Tapped;
+                    var border = new Border
+                    {
+                        Background = _transparentBrush,
+                        CornerRadius = new CornerRadius(6),
+                        Padding = new Thickness(8, 0, 8, 0),
+                        VerticalAlignment = VerticalAlignment.Stretch,
+                        Tag = new AppMenuItem { Index = i, TargetHwnd = hwnd, SubMenuHandle = subMenu },
+                        Child = textBlock
+                    };
+
+                    if (!grayed)
+                    {
+                        border.PointerEntered += Host_PointerEntered;
+                        border.PointerExited += Host_PointerExited;
+                        border.PointerPressed += Host_PointerPressed;
+                        border.PointerReleased += Host_PointerReleased;
+                        border.Tapped += AppMenuItem_Tapped;
+                    }
+
+                    AppMenuPanel.Children.Add(border);
                 }
-
-                AppMenuPanel.Children.Add(border);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(textBuf);
             }
         }
 
