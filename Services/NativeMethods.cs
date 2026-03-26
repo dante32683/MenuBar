@@ -63,11 +63,49 @@ namespace MenuBar.Services
 
         // Messages
         public const int WM_COMMAND = 0x0111;
+        public const uint WM_SETTINGCHANGE = 0x001A;
+        public const uint WM_DISPLAYCHANGE = 0x007E;
+        public const uint WM_DPICHANGED = 0x02E0;
 
         // Keyboard
         public const byte VK_TAB = 0x09;
 
-        // Window icon messages
+        // Subclassing
+        public delegate IntPtr SUBCLASSPROC(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, uint uIdSubclass, IntPtr dwRefData);
+
+        [DllImport("User32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern uint RegisterWindowMessage(string lpString);
+
+        [DllImport("Comctl32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern bool SetWindowSubclass(IntPtr hWnd, SUBCLASSPROC callback, uint uIdSubclass, IntPtr dwRefData);
+
+        [DllImport("Comctl32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern bool RemoveWindowSubclass(IntPtr hWnd, SUBCLASSPROC callback, uint uIdSubclass);
+
+        [DllImport("Comctl32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
+
+        // Virtual Desktop COM
+        [ComImport]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        [Guid("a5cd92ff-29be-454c-8d04-d82879fb3f1b")]
+        public interface IVirtualDesktopManager
+        {
+            [PreserveSig]
+            int IsWindowOnCurrentVirtualDesktop(IntPtr topLevelWindow, out int onCurrentDesktop);
+
+            [PreserveSig]
+            int GetWindowDesktopId(IntPtr topLevelWindow, out Guid desktopId);
+
+            [PreserveSig]
+            int MoveWindowToDesktop(IntPtr topLevelWindow, [MarshalAs(UnmanagedType.LPStruct)] ref Guid desktopId);
+        }
+
+        [ComImport]
+        [Guid("aa509086-5ca9-4c25-8f95-589d3c07b48a")]
+        public class VirtualDesktopManager { }
+
+        // Messages
         public const int WM_GETICON = 0x007F;
         public const int ICON_SMALL = 0;
         public const int ICON_BIG = 1;

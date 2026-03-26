@@ -124,7 +124,7 @@
                     <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitle, Mode=OneWay}"
                                Visibility="{x:Bind ViewModel.TitleVisibility, Mode=OneWay}"
                                Foreground="White"
-                               FontFamily="Segoe UI Variable"
+                               FontFamily="Segoe UI Variable, Segoe UI"
                                FontWeight="SemiBold"
                                FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                MaxWidth="340"
@@ -188,13 +188,13 @@
                                         </Border>
                                         <StackPanel VerticalAlignment="Center" Spacing="2">
                                             <TextBlock Text="{x:Bind ViewModel.MediaTitle, Mode=OneWay}"
-                                                       FontFamily="Segoe UI Variable"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
                                                        FontWeight="SemiBold"
                                                        FontSize="14"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxWidth="180" />
                                             <TextBlock Text="{x:Bind ViewModel.MediaArtist, Mode=OneWay}"
-                                                       FontFamily="Segoe UI Variable"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                        FontSize="12"
                                                        TextTrimming="CharacterEllipsis"
@@ -229,7 +229,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
                             <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}"
-                                       FontFamily="Segoe UI Variable"
+                                       FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                        MaxWidth="210"
                                        TextTrimming="CharacterEllipsis"
@@ -289,7 +289,7 @@
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                                             <TextBlock x:Name="NetworkFlyoutName"
                                                        Text="Wi-Fi"
-                                                       FontFamily="Segoe UI Variable"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
                                                        FontWeight="SemiBold"
                                                        FontSize="22"
                                                        Foreground="White"
@@ -297,7 +297,7 @@
                                                        MaxWidth="180" />
                                             <TextBlock x:Name="NetworkFlyoutStatus"
                                                        Text="Connected"
-                                                       FontFamily="Segoe UI Variable"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
                                                        FontSize="12"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
@@ -305,7 +305,7 @@
                                     <TextBlock x:Name="NetworkFlyoutSpeed"
                                                Grid.Row="1"
                                                Text=""
-                                               FontFamily="Segoe UI Variable"
+                                               FontFamily="Segoe UI Variable, Segoe UI"
                                                FontSize="12"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                Visibility="Collapsed"
@@ -373,13 +373,13 @@
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                                             <TextBlock x:Name="BatteryFlyoutPercent"
                                                        Text="100%"
-                                                       FontFamily="Segoe UI Variable"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
                                                        FontWeight="SemiBold"
                                                        FontSize="22"
                                                        Foreground="White" />
                                             <TextBlock x:Name="BatteryFlyoutStatus"
                                                        Text="On battery"
-                                                       FontFamily="Segoe UI Variable"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
                                                        FontSize="12"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
@@ -387,7 +387,7 @@
                                     <TextBlock x:Name="BatteryFlyoutTime"
                                                Grid.Row="1"
                                                Text=""
-                                               FontFamily="Segoe UI Variable"
+                                               FontFamily="Segoe UI Variable, Segoe UI"
                                                FontSize="12"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                Visibility="Collapsed"
@@ -413,7 +413,7 @@
                                            HorizontalAlignment="Center" />
                             </Grid>
                             <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}"
-                                       FontFamily="Segoe UI Variable"
+                                       FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                        Foreground="White"
                                        VerticalAlignment="Center" />
@@ -438,7 +438,7 @@
                                 Margin="0,3,0,0"
                                 VerticalAlignment="Stretch">
                             <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}"
-                                       FontFamily="Segoe UI Variable"
+                                       FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                        Foreground="White"
                                        VerticalAlignment="Center" />
@@ -464,7 +464,7 @@
                         PointerReleased="VirtualDesktopHost_PointerReleased"
                         Tapped="VirtualDesktopHost_Tapped">
                     <TextBlock Text="{x:Bind ViewModel.VirtualDesktopText, Mode=OneWay}"
-                               FontFamily="Segoe UI Variable"
+                               FontFamily="Segoe UI Variable, Segoe UI"
                                FontWeight="SemiBold"
                                FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                Foreground="White"

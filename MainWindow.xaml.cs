@@ -75,6 +75,9 @@ namespace MenuBar
         private NativeMethods.WinEventDelegate _desktopSwitchDelegate;
         private IntPtr _appMenuTargetHwnd;
 
+        private uint _taskbarCreatedMsg;
+        private NativeMethods.SUBCLASSPROC _subclassProc;
+
         private sealed class AppMenuItem
         {
             public uint Index;
@@ -89,6 +92,11 @@ namespace MenuBar
             _hwnd = WindowNative.GetWindowHandle(this);
             _mediaService = new MediaService(DispatcherQueue);
             Closed += Window_Closed;
+
+            // Register shell messages and subclass window for system events
+            _taskbarCreatedMsg = NativeMethods.RegisterWindowMessage("TaskbarCreated");
+            _subclassProc = NewWindowProc;
+            NativeMethods.SetWindowSubclass(_hwnd, _subclassProc, 0, IntPtr.Zero);
 
             LoadSettings(applyLayout: false);
             ConfigureWindow();
@@ -106,6 +114,27 @@ namespace MenuBar
 
             Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged += OnNetworkStatusChanged;
             _uiSettings.ColorValuesChanged += OnAccentColorChanged;
+        }
+
+        private IntPtr NewWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, uint uIdSubclass, IntPtr dwRefData)
+        {
+            if (uMsg == _taskbarCreatedMsg)
+            {
+                // Explorer restarted — re-register AppBar to restore docking
+                RegisterOrUpdateAppBar(registerIfNeeded: true);
+            }
+            else if (uMsg == NativeMethods.WM_DPICHANGED)
+            {
+                // DPI changed (e.g. moved between monitors) — recalculate physical layout
+                RegisterOrUpdateAppBar(registerIfNeeded: false);
+            }
+            else if (uMsg == NativeMethods.WM_DISPLAYCHANGE)
+            {
+                // Resolution or monitor count changed — verify bar bounds
+                RegisterOrUpdateAppBar(registerIfNeeded: false);
+            }
+
+            return NativeMethods.DefSubclassProc(hWnd, uMsg, wParam, lParam);
         }
 
         #region Window Configuration
@@ -151,12 +180,15 @@ namespace MenuBar
 
         private void RegisterOrUpdateAppBar(bool registerIfNeeded)
         {
-            int screenX = NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
-            int screenY = NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
-            int screenW = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXVIRTUALSCREEN);
+            // Use DisplayArea to find the monitor where our window is (or should be).
+            // This is much more reliable on multi-monitor setups than SM_XVIRTUALSCREEN.
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
+            var displayArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary);
+            
+            var monitorBounds = displayArea.OuterBounds;
+            var workArea = displayArea.WorkArea;
 
             // barHeight is in DIPs (logical pixels) as configured by the user.
-            // Win32 APIs (SetWindowPos, SHAppBarMessage) require physical pixels.
             int barHeight = _settings.GetEffectiveBarHeight();
             uint dpi = NativeMethods.GetDpiForWindow(_hwnd);
             double dpiScale = dpi > 0 ? dpi / 96.0 : 1.0;
@@ -175,25 +207,29 @@ namespace MenuBar
                 _appBarRegistered = true;
             }
 
-            abd.rc.left = screenX;
-            abd.rc.top = screenY;
-            abd.rc.right = screenX + screenW;
-            abd.rc.bottom = screenY + physBarHeight;       // physical pixels
+            // Target the specific monitor's bounds in virtual screen coordinates
+            abd.rc.left = monitorBounds.X;
+            abd.rc.top = monitorBounds.Y;
+            abd.rc.right = monitorBounds.X + monitorBounds.Width;
+            abd.rc.bottom = monitorBounds.Y + physBarHeight;
 
             NativeMethods.SHAppBarMessage(NativeMethods.ABM_QUERYPOS, ref abd);
-            abd.rc.bottom = abd.rc.top + physBarHeight;    // physical pixels
+            // Re-assert our desired height in case QUERYPOS moved it
+            abd.rc.bottom = abd.rc.top + physBarHeight;
             NativeMethods.SHAppBarMessage(NativeMethods.ABM_SETPOS, ref abd);
 
-            // XAML properties are in DIPs — do not use physBarHeight here.
+            // XAML properties are in DIPs
             BackgroundBorder.Height = barHeight;
             MainContentGrid.Height = barHeight;
+
+            // Final window placement on the correct monitor
             NativeMethods.SetWindowPos(
                 _hwnd,
                 (IntPtr)NativeMethods.HWND_TOPMOST,
-                screenX,
-                screenY,
-                screenW,
-                physBarHeight,                             // physical pixels
+                abd.rc.left,
+                abd.rc.top,
+                abd.rc.right - abd.rc.left,
+                physBarHeight,
                 NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
         }
 
@@ -573,14 +609,13 @@ namespace MenuBar
         {
             if (!_settings.ShowVirtualDesktop) return;
 
-            // Registry-based: reads CurrentVirtualDesktop which Windows updates atomically
-            // on every switch, before EVENT_SYSTEM_DESKTOPSWITCH fires. No hwnd needed.
-            string label = VirtualDesktopService.GetCurrentDesktopLabel();
+            // Uses IVirtualDesktopManager if possible, falling back to registry
+            string label = VirtualDesktopService.GetCurrentDesktopLabel(_hwnd);
             if (label != null)
                 ViewModel.VirtualDesktopText = label;
         }
 
-        private void RefreshAppMenu()
+        private async void RefreshAppMenu()
         {
             if (!_settings.ShowAppMenu) return;
 
@@ -605,16 +640,22 @@ namespace MenuBar
             IntPtr hMenu = NativeMethods.GetMenu(hwnd);
             if (hMenu == IntPtr.Zero)
             {
-                // No Win32 HMENU — try UI Automation (WPF apps, VS Code, Win11 Notepad, etc.)
-                var uiaItems = UiaMenuService.GetMenuItems(hwnd);
-                if (uiaItems != null)
+                // No Win32 HMENU — try UI Automation (WPF apps, VS Code, Win11 Notepad, etc.) on background thread
+                var uiaItems = await UiaMenuService.GetMenuItemsAsync(hwnd);
+                if (uiaItems != null && hwnd == _appMenuTargetHwnd)
                 {
-                    double uiaFontSize = ViewModel.TextFontSize;
-                    foreach (var uiaItem in uiaItems)
+                    DispatcherQueue.TryEnqueue(() =>
                     {
-                        AddMenuItemBorder(uiaItem.Label, false, uiaFontSize,
-                            new AppMenuItem { TargetHwnd = hwnd, UiaElement = uiaItem.Element });
-                    }
+                        // Verify we are still targeting the same window after the async wait
+                        if (hwnd != _appMenuTargetHwnd) return;
+
+                        double uiaFontSize = ViewModel.TextFontSize;
+                        foreach (var uiaItem in uiaItems)
+                        {
+                            AddMenuItemBorder(uiaItem.Label, false, uiaFontSize,
+                                new AppMenuItem { TargetHwnd = hwnd, UiaElement = uiaItem.Element });
+                        }
+                    });
                 }
                 return;
             }
@@ -672,7 +713,7 @@ namespace MenuBar
             var textBlock = new TextBlock
             {
                 Text = label,
-                FontFamily = new FontFamily("Segoe UI Variable"),
+                FontFamily = new FontFamily("Segoe UI Variable, Segoe UI"),
                 FontSize = fontSize,
                 Foreground = grayed
                     ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 120, 120, 120))

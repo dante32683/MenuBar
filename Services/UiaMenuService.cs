@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace MenuBar.Services
 {
@@ -222,9 +223,18 @@ namespace MenuBar.Services
 
         /// <summary>
         /// Returns top-level menu items from the UIA accessibility tree of <paramref name="hwnd"/>.
+        /// Runs on a background thread to prevent UI hangs.
+        /// </summary>
+        public static Task<List<UiaMenuItem>> GetMenuItemsAsync(IntPtr hwnd)
+        {
+            return Task.Run(() => GetMenuItems(hwnd));
+        }
+
+        /// <summary>
+        /// Returns top-level menu items from the UIA accessibility tree of <paramref name="hwnd"/>.
         /// Returns null when no MenuBar is found (most Chromium apps, apps with no AT support).
         /// </summary>
-        public static List<UiaMenuItem> GetMenuItems(IntPtr hwnd)
+        private static List<UiaMenuItem> GetMenuItems(IntPtr hwnd)
         {
             try
             {
