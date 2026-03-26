@@ -12,11 +12,14 @@ A macOS-style menu bar for Windows built with WinUI 3. It runs as a top-docked W
 # Debug build
 dotnet build
 
-# Release publish to local folder
+# Full Release publish
 dotnet publish -c Release -r win-x64 -p:Platform=x64 -o publish/win-x64
+
+# Single-File Release publish
+dotnet publish -c Release -r win-x64 -p:Platform=x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-single
 ```
 
-No solution file — build from the project directory directly. No tests exist.
+**Important:** Whenever publishing, you MUST publish to **both** `publish/win-x64` (normal) and `publish/win-x64-single` (single-file version).
 
 ## Architecture
 
