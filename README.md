@@ -14,18 +14,22 @@ Sits at the top of your screen and shows the active window title, app menus, med
 - Virtual desktop name
 - Clock (tap it to open Notification Center)
 
+## Multi-monitor & Stability
+
+- **Per-Monitor Docking:** Automatically adjusts when screen resolution or DPI changes using Win32 subclassing.
+- **Explorer Recovery:** If `explorer.exe` crashes or restarts, MenuBar re-registers itself automatically.
+- **High Performance:** UI Automation (app menus) and system COM calls (virtual desktops) run on background threads to ensure the UI never hangs.
+- **Hybrid Desktop Tracking:** Uses both COM and Registry for accurate virtual desktop labels across all Windows 10/11 versions.
+
 ## Running it
 
-Just run `MenuBar.exe`. No installer needed.
+Just run `MenuBar.exe` from the `publish/win-x64` folder. No installer needed.
 
 To build it yourself:
 
-```bash
-# debug
-dotnet build
-
-# release
-dotnet publish -c Release -r win-x64 -p:Platform=x64 -o publish/win-x64
+```powershell
+# Build and publish to a single folder
+dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -o publish/win-x64
 ```
 
 Needs .NET 8 and Windows App SDK 1.5. Windows 10 1809 or newer.

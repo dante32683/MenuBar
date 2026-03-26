@@ -35,11 +35,11 @@ Single-window app. `MainWindow.xaml` / `MainWindow.xaml.cs` coordinates all serv
 - `ViewModels/MainViewModel` — `x:Bind OneWay` bindings for all bar segments. Scaling properties (`HostCornerRadius`, `HostPadding`, `BatteryIconWidth`, `IconFontSize`, `TextFontSize`) are computed from `bar_height` in `LoadSettings()`.
 - `Services/MediaService` — SMTC session API (no keyboard simulation).
 - `Services/HardwareService` — Battery via `Battery.AggregateBattery.GetReport()` + `GetSystemPowerStatus`. Network via `Windows.Networking.Connectivity.NetworkInformation`.
-- `Services/VirtualDesktopService` — Registry-only; reads `CurrentVirtualDesktop` GUID and `VirtualDesktopIDs` blob from `HKCU\...\Explorer\VirtualDesktops`, resolves name from `Desktops\{GUID}\Name`.
-- `Services/NativeMethods` — Win32 P/Invoke: AppBar, window management, keyboard, WinEvent hooks.
-- `Services/SettingsService` — Reads/writes `settings.json` from `AppContext.BaseDirectory`; hot-reload from context menu.
+- `Services/VirtualDesktopService` — Hybrid COM/Registry; uses `IVirtualDesktopManager.GetWindowDesktopId` for window identification and Registry for custom names/ordinals.
+- `Services/NativeMethods` — Win32 P/Invoke: AppBar, window management, subclassing, `IVirtualDesktopManager` COM.
+- `Services/SettingsService` — Reads/writes `settings.json`; hot-reload from context menu.
 
-**Window behavior:** Top-edge AppBar via `SHAppBarMessage`, `WS_EX_TOOLWINDOW` to hide from Alt-Tab, `DesktopAcrylicBackdrop` with `MicaBackdrop` fallback.
+**Window behavior:** Top-edge AppBar via `SHAppBarMessage` using `DisplayArea.OuterBounds` for monitor-aware docking. Win32 subclassing (`SetWindowSubclass`) handles `WM_DPICHANGED` (0x02E0), `WM_DISPLAYCHANGE` (0x007E), and `TaskbarCreated`.
 
 **Flyout pattern:** Logo, media, network, battery use `FlyoutBase.AttachedFlyout` on the **inner Border** (not the outer wrapper Grid). Always call `ToggleAttachedFlyout(GetHostBorder(sender))` — never `(FrameworkElement)sender` — because the Tapped event fires on the outer Grid. The clock sends `Win+N` to open notification center.
 
