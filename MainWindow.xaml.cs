@@ -77,6 +77,7 @@ namespace MenuBar
 
         private uint _taskbarCreatedMsg;
         private NativeMethods.SUBCLASSPROC _subclassProc;
+        private bool _isDraggingSlider;
 
         private sealed class AppMenuItem
         {
@@ -114,6 +115,10 @@ namespace MenuBar
 
             Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged += OnNetworkStatusChanged;
             _uiSettings.ColorValuesChanged += OnAccentColorChanged;
+
+            // Use handledEventsToo=true to catch events before/after Slider's internal logic
+            MediaProgressSlider.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(MediaProgressSlider_PointerPressed), true);
+            MediaProgressSlider.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(MediaProgressSlider_PointerReleased), true);
         }
 
         private IntPtr NewWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, uint uIdSubclass, IntPtr dwRefData)
@@ -757,8 +762,34 @@ namespace MenuBar
 
                 ViewModel.MediaTitle = state.Title;
                 ViewModel.MediaArtist = state.Artist;
+                ViewModel.MediaSourceApp = string.IsNullOrWhiteSpace(state.SourceApp) ? "" : state.SourceApp;
                 ViewModel.MediaAlbumCover = state.AlbumCover;
                 ViewModel.MediaPlayPauseSymbol = state.Playing ? Symbol.Pause : Symbol.Play;
+
+                ViewModel.MediaShuffleOpacity = state.IsShuffleActive == true ? 1.0 : 0.5;
+                ViewModel.MediaRepeatOpacity = state.RepeatMode == Windows.Media.MediaPlaybackAutoRepeatMode.None ? 0.5 : 1.0;
+                ViewModel.MediaRepeatIcon = state.RepeatMode == Windows.Media.MediaPlaybackAutoRepeatMode.Track ? "\uE8ED" : "\uE8EE";
+
+                if (_isDraggingSlider)
+                {
+                    // User is dragging: text already set by ValueChanged, don't touch slider
+                }
+                else
+                {
+                    TimeSpan currentPos = state.Position;
+                    if (state.Playing)
+                    {
+                        TimeSpan elapsedSinceUpdate = DateTimeOffset.Now - state.LastUpdatedTime;
+                        currentPos += elapsedSinceUpdate;
+                        if (currentPos > state.EndTime) currentPos = state.EndTime;
+                    }
+
+                    MediaProgressSlider.Maximum = state.EndTime.TotalSeconds;
+                    MediaProgressSlider.Value = currentPos.TotalSeconds;
+                    
+                    ViewModel.MediaDurationText = FormatTimeSpan(state.EndTime);
+                    ViewModel.MediaPositionText = FormatTimeSpan(currentPos);
+                }
             }
             else
             {
@@ -769,9 +800,22 @@ namespace MenuBar
 
                 ViewModel.MediaTitle = "Nothing playing";
                 ViewModel.MediaArtist = string.Empty;
+                ViewModel.MediaSourceApp = string.Empty;
                 ViewModel.MediaAlbumCover = null;
                 ViewModel.MediaPlayPauseSymbol = Symbol.Play;
+
+                MediaProgressSlider.Maximum = 1;
+                MediaProgressSlider.Value = 0;
+                ViewModel.MediaDurationText = "0:00";
+                ViewModel.MediaPositionText = "0:00";
             }
+        }
+
+        private static string FormatTimeSpan(TimeSpan ts)
+        {
+            if (ts.TotalHours >= 1)
+                return ts.ToString(@"h\:mm\:ss");
+            return ts.ToString(@"m\:ss");
         }
 
         #endregion
@@ -818,6 +862,22 @@ namespace MenuBar
             {
                 BatteryFlyoutTime.Text = remaining;
                 BatteryFlyoutTime.Visibility = Visibility.Visible;
+            }
+
+            if (_batteryInfo.AverageChargeRateInMilliwatts.HasValue && _batteryInfo.AverageChargeRateInMilliwatts.Value != 0)
+            {
+                double watts = _batteryInfo.AverageChargeRateInMilliwatts.Value / 1000.0;
+                string chargeRateLabel = _batteryInfo.AverageChargeRateInMilliwatts.Value > 0 ? "Charging at" : "Discharging at";
+                BatteryFlyoutChargeRate.Text = $"{chargeRateLabel} {Math.Abs(watts):F1}W (1m avg)";
+                BatteryFlyoutChargeRate.Visibility = Visibility.Visible;
+                // Adjust margin if time remaining is also visible
+                BatteryFlyoutChargeRate.Margin = BatteryFlyoutTime.Visibility == Visibility.Visible
+                    ? new Thickness(0, 25, 0, 0)
+                    : new Thickness(0, 10, 0, 0);
+            }
+            else
+            {
+                BatteryFlyoutChargeRate.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -877,6 +937,17 @@ namespace MenuBar
         private void MediaHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
             ToggleAttachedFlyout(GetHostBorder(sender));
+        }
+
+        private void MediaFlyout_Opened(object sender, object e)
+        {
+            _mediaService.SetHighFrequencyUpdate(true);
+            _ = _mediaService.RefreshAsync(full: true);
+        }
+
+        private void MediaFlyout_Closed(object sender, object e)
+        {
+            _mediaService.SetHighFrequencyUpdate(false);
         }
 
         private void NetworkHost_Tapped(object sender, TappedRoutedEventArgs e)
@@ -1028,6 +1099,58 @@ namespace MenuBar
         private void MediaNext_Click(object sender, RoutedEventArgs e)
         {
             _ = _mediaService.SendNextAsync();
+        }
+
+        private void MediaShuffle_Click(object sender, RoutedEventArgs e)
+        {
+            _ = _mediaService.ToggleShuffleAsync();
+        }
+
+        private void MediaRepeat_Click(object sender, RoutedEventArgs e)
+        {
+            _ = _mediaService.ToggleRepeatAsync();
+        }
+
+        private void MediaProgressSlider_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Slider slider)
+            {
+                _isDraggingSlider = true;
+                _mediaService.SuppressUpdates = true;
+                slider.CapturePointer(e.Pointer);
+            }
+        }
+
+        private void MediaProgressSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            if (_isDraggingSlider)
+            {
+                ViewModel.MediaPositionText = FormatTimeSpan(TimeSpan.FromSeconds(e.NewValue));
+            }
+        }
+
+        private async void MediaProgressSlider_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Slider slider)
+            {
+                slider.ReleasePointerCapture(e.Pointer);
+
+                if (_isDraggingSlider)
+                {
+                    _isDraggingSlider = false;
+                    // Keep SuppressUpdates = true while seeking
+                    await _mediaService.SeekAsync(TimeSpan.FromSeconds(slider.Value));
+                    
+                    // Keep suppression active for 1.5s after release to let OS catch up
+                    await Task.Delay(1500);
+                    _mediaService.SuppressUpdates = false;
+                    _ = _mediaService.RefreshAsync(full: false);
+                    return;
+                }
+            }
+
+            _isDraggingSlider = false;
+            _mediaService.SuppressUpdates = false;
         }
 
         // When a host widget uses a transparent outer Grid for Fitts's Law hit-test expansion,

@@ -23,6 +23,12 @@
                 <Setter Property="CornerRadius" Value="8" />
             </Style>
 
+            <Style x:Key="MediaProgressSliderStyle" TargetType="Slider">
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0" />
+            </Style>
+
             <!-- The brush is only a tint layer; the actual blur comes from Flyout/SystemBackdrop. -->
             <AcrylicBrush x:Key="FlyoutAcrylicBackground"
                           TintColor="{StaticResource SystemAccentColorDark2}"
@@ -158,7 +164,10 @@
                             VerticalAlignment="Stretch">
                         <FlyoutBase.AttachedFlyout>
                             <!-- Same backdrop rule applies to all popups in this file. -->
-                            <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
+                            <Flyout Opened="MediaFlyout_Opened"
+                                    Closed="MediaFlyout_Closed"
+                                    Placement="Bottom"
+                                    ShouldConstrainToRootBounds="False">
                                 <Flyout.SystemBackdrop>
                                     <media:DesktopAcrylicBackdrop />
                                 </Flyout.SystemBackdrop>
@@ -175,9 +184,10 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                    <StackPanel Orientation="Horizontal" Spacing="16" Grid.Row="0">
                                         <Border Width="80"
                                                 Height="80"
                                                 CornerRadius="8"
@@ -199,14 +209,48 @@
                                                        FontSize="12"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxWidth="180" />
+                                            <TextBlock Text="{x:Bind ViewModel.MediaSourceApp, Mode=OneWay}"
+                                                       FontFamily="Segoe UI Variable, Segoe UI"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                       FontSize="11"
+                                                       FontStyle="Italic"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxWidth="180" />
                                         </StackPanel>
                                     </StackPanel>
 
-                                    <StackPanel Grid.Row="1"
+                                    <StackPanel Orientation="Vertical" Spacing="4" Margin="0,12,0,0" Grid.Row="1">
+                                        <Slider x:Name="MediaProgressSlider"
+                                                Minimum="0"
+                                                IsThumbToolTipEnabled="False"
+                                                Padding="0"
+                                                Height="24"
+                                                ValueChanged="MediaProgressSlider_ValueChanged"
+                                                PointerReleased="MediaProgressSlider_PointerReleased"
+                                                PointerPressed="MediaProgressSlider_PointerPressed"
+                                                Style="{StaticResource MediaProgressSliderStyle}" />
+                                        <Grid>
+                                            <TextBlock Text="{x:Bind ViewModel.MediaPositionText, Mode=OneWay}"
+                                                       FontSize="10"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       HorizontalAlignment="Left" />
+                                            <TextBlock Text="{x:Bind ViewModel.MediaDurationText, Mode=OneWay}"
+                                                       FontSize="10"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="2"
                                                 Orientation="Horizontal"
                                                 HorizontalAlignment="Center"
                                                 Spacing="14"
                                                 Margin="0,16,0,0">
+                                        <Button Click="MediaShuffle_Click"
+                                                Style="{StaticResource MediaTransportButtonStyle}"
+                                                Opacity="{x:Bind ViewModel.MediaShuffleOpacity, Mode=OneWay}">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B1;" FontSize="14" />
+                                        </Button>
                                         <Button Click="MediaPrevious_Click"
                                                 Style="{StaticResource MediaTransportButtonStyle}">
                                             <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE892;" FontSize="16" />
@@ -221,6 +265,11 @@
                                         <Button Click="MediaNext_Click"
                                                 Style="{StaticResource MediaTransportButtonStyle}">
                                             <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE893;" FontSize="16" />
+                                        </Button>
+                                        <Button Click="MediaRepeat_Click"
+                                                Style="{StaticResource MediaTransportButtonStyle}"
+                                                Opacity="{x:Bind ViewModel.MediaRepeatOpacity, Mode=OneWay}">
+                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="{x:Bind ViewModel.MediaRepeatIcon, Mode=OneWay}" FontSize="14" />
                                         </Button>
                                     </StackPanel>
                                 </Grid>
@@ -392,6 +441,14 @@
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                Visibility="Collapsed"
                                                Margin="0,10,0,0" />
+                                    <TextBlock x:Name="BatteryFlyoutChargeRate"
+                                               Grid.Row="1"
+                                               Text=""
+                                               FontFamily="Segoe UI Variable, Segoe UI"
+                                               FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Visibility="Collapsed"
+                                               Margin="0,25,0,0" />
                                 </Grid>
                             </Flyout>
                         </FlyoutBase.AttachedFlyout>

@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Media.Control;
@@ -14,8 +17,14 @@ namespace MenuBar.Services
         {
             public string Title { get; set; } = string.Empty;
             public string Artist { get; set; } = string.Empty;
+            public string SourceApp { get; set; } = string.Empty;
             public bool Playing { get; set; }
             public ImageSource AlbumCover { get; set; }
+            public bool? IsShuffleActive { get; set; }
+            public Windows.Media.MediaPlaybackAutoRepeatMode? RepeatMode { get; set; }
+            public TimeSpan Position { get; set; }
+            public TimeSpan EndTime { get; set; }
+            public DateTimeOffset LastUpdatedTime { get; set; }
 
             public bool HasContent =>
                 !string.IsNullOrWhiteSpace(Title) || !string.IsNullOrWhiteSpace(Artist);
@@ -26,13 +35,27 @@ namespace MenuBar.Services
         private GlobalSystemMediaTransportControlsSessionManager _manager;
         private GlobalSystemMediaTransportControlsSession _currentSession;
         private readonly DispatcherQueue _dispatcher;
+        private readonly DispatcherQueueTimer _progressTimer;
+
+        private string _lastTrackId = string.Empty;
+        private string _lastPlayingAppId = string.Empty;
+        private ImageSource _cachedAlbumCover;
 
         public event Action<MediaState> StateChanged;
         public MediaState CurrentState { get; private set; } = MediaState.Empty;
+        public bool SuppressUpdates { get; set; }
 
         public MediaService(DispatcherQueue dispatcher)
         {
             _dispatcher = dispatcher;
+            _progressTimer = _dispatcher.CreateTimer();
+            _progressTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _progressTimer.Tick += (_, _) => _ = RefreshAsync(full: false);
+        }
+
+        public void SetHighFrequencyUpdate(bool enabled)
+        {
+            _progressTimer.Interval = enabled ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromMilliseconds(500);
         }
 
         public async Task InitializeAsync()
@@ -41,8 +64,9 @@ namespace MenuBar.Services
             {
                 _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
                 _manager.CurrentSessionChanged += OnCurrentSessionChanged;
-                AttachSession(FindBestSession(_manager));
-                _dispatcher.TryEnqueue(() => _ = RefreshAsync());
+                _manager.SessionsChanged += OnSessionsChanged;
+                
+                UpdateSessionSelection();
             }
             catch
             {
@@ -54,72 +78,70 @@ namespace MenuBar.Services
             }
         }
 
-        private static GlobalSystemMediaTransportControlsSession FindBestSession(
-            GlobalSystemMediaTransportControlsSessionManager manager)
+        private GlobalSystemMediaTransportControlsSession FindBestSession()
         {
             try
             {
-                var playing = manager.GetSessions()
-                    .FirstOrDefault(s => s.GetPlaybackInfo()?.PlaybackStatus ==
-                        GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
-                return playing ?? manager.GetCurrentSession();
+                var sessions = _manager.GetSessions();
+                if (sessions == null || sessions.Count == 0) return null;
+
+                // 1. Any session actually playing?
+                // We prioritize sessions with a non-zero timeline (actual media) over others (like meetings)
+                var playingSessions = sessions
+                    .Where(s => s.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
+                    .OrderByDescending(s => s.GetTimelineProperties()?.EndTime.Ticks > 0)
+                    .ToList();
+
+                if (playingSessions.Any()) return playingSessions.First();
+
+                // 2. If nothing is playing, prefer the last app that was playing (Stickiness)
+                if (!string.IsNullOrEmpty(_lastPlayingAppId))
+                {
+                    var sticky = sessions.FirstOrDefault(s => s.SourceAppUserModelId == _lastPlayingAppId);
+                    if (sticky != null) return sticky;
+                }
+
+                // 3. Fallback to what the OS thinks is current
+                return _manager.GetCurrentSession();
             }
             catch
             {
-                return manager.GetCurrentSession();
+                return _manager.GetCurrentSession();
             }
+        }
+
+        private void UpdateSessionSelection()
+        {
+            _dispatcher.TryEnqueue(() =>
+            {
+                var best = FindBestSession();
+                
+                // Only switch if the session is actually different
+                if (best?.SourceAppUserModelId != _currentSession?.SourceAppUserModelId)
+                {
+                    AttachSession(best);
+                    _ = RefreshAsync(full: true);
+                }
+                else if (best == null && _currentSession != null)
+                {
+                    AttachSession(null);
+                    _ = RefreshAsync(full: true);
+                }
+            });
         }
 
         private void OnCurrentSessionChanged(
             GlobalSystemMediaTransportControlsSessionManager sender,
             CurrentSessionChangedEventArgs args)
         {
-            _dispatcher.TryEnqueue(() =>
-            {
-                var newSession = sender.GetCurrentSession();
+            UpdateSessionSelection();
+        }
 
-                // If the new OS-current session is actively Playing, follow it immediately.
-                if (newSession != null)
-                {
-                    try
-                    {
-                        var status = newSession.GetPlaybackInfo()?.PlaybackStatus;
-                        if (status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
-                        {
-                            AttachSession(newSession);
-                            _ = RefreshAsync();
-                            return;
-                        }
-                    }
-                    catch { }
-                }
-
-                // New OS-current is not Playing. Preserve our current session if it is
-                // still alive in GetSessions() and has Paused status (e.g. Spotify paused
-                // → don't hand control to Google Meet).
-                if (_currentSession != null)
-                {
-                    try
-                    {
-                        bool stillAlive = sender.GetSessions()
-                            .Any(s => s.SourceAppUserModelId == _currentSession.SourceAppUserModelId);
-                        if (stillAlive)
-                        {
-                            var st = _currentSession.GetPlaybackInfo()?.PlaybackStatus;
-                            if (st == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused)
-                            {
-                                _ = RefreshAsync();
-                                return;
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                // Fallback: take whatever Windows says is current.
-                AttachSession(newSession);
-                _ = RefreshAsync();
-            });
+        private void OnSessionsChanged(
+            GlobalSystemMediaTransportControlsSessionManager sender,
+            SessionsChangedEventArgs args)
+        {
+            UpdateSessionSelection();
         }
 
         private void AttachSession(GlobalSystemMediaTransportControlsSession session)
@@ -128,14 +150,18 @@ namespace MenuBar.Services
             {
                 _currentSession.MediaPropertiesChanged -= OnMediaPropertiesChanged;
                 _currentSession.PlaybackInfoChanged -= OnPlaybackInfoChanged;
+                _currentSession.TimelinePropertiesChanged -= OnTimelinePropertiesChanged;
             }
 
             _currentSession = session;
+            _lastTrackId = string.Empty;
+            _cachedAlbumCover = null;
 
             if (_currentSession != null)
             {
                 _currentSession.MediaPropertiesChanged += OnMediaPropertiesChanged;
                 _currentSession.PlaybackInfoChanged += OnPlaybackInfoChanged;
+                _currentSession.TimelinePropertiesChanged += OnTimelinePropertiesChanged;
             }
         }
 
@@ -143,62 +169,138 @@ namespace MenuBar.Services
             GlobalSystemMediaTransportControlsSession sender,
             MediaPropertiesChangedEventArgs args)
         {
-            _dispatcher.TryEnqueue(() => _ = RefreshAsync());
+            _dispatcher.TryEnqueue(() => _ = RefreshAsync(full: true));
         }
 
         private void OnPlaybackInfoChanged(
             GlobalSystemMediaTransportControlsSession sender,
             PlaybackInfoChangedEventArgs args)
         {
-            _dispatcher.TryEnqueue(() => _ = RefreshAsync());
+            _dispatcher.TryEnqueue(() => _ = RefreshAsync(full: false));
         }
 
-        public async Task RefreshAsync()
+        private void OnTimelinePropertiesChanged(
+            GlobalSystemMediaTransportControlsSession sender,
+            TimelinePropertiesChangedEventArgs args)
+        {
+            _dispatcher.TryEnqueue(() => _ = RefreshAsync(full: false));
+        }
+
+        public async Task RefreshAsync(bool full)
         {
             if (_currentSession == null)
             {
                 CurrentState = MediaState.Empty;
                 StateChanged?.Invoke(CurrentState);
+                if (_progressTimer.IsRunning) _progressTimer.Stop();
                 return;
             }
 
+            if (SuppressUpdates) return;
+
             try
             {
-                var props = await _currentSession.TryGetMediaPropertiesAsync();
                 var playback = _currentSession.GetPlaybackInfo();
+                var timeline = _currentSession.GetTimelineProperties();
+                
+                // Manage timer based on playback status
+                bool isPlaying = playback?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+                if (isPlaying)
+                {
+                    _lastPlayingAppId = _currentSession.SourceAppUserModelId;
+                }
+
+                if (isPlaying && !_progressTimer.IsRunning) _progressTimer.Start();
+                else if (!isPlaying && _progressTimer.IsRunning) _progressTimer.Stop();
+
                 var state = new MediaState
                 {
-                    Title = props?.Title ?? string.Empty,
-                    Artist = props?.Artist ?? string.Empty,
-                    Playing = playback.PlaybackStatus ==
-                              GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
+                    SourceApp = FormatSourceApp(_currentSession.SourceAppUserModelId),
+                    Playing = isPlaying,
+                    IsShuffleActive = playback?.IsShuffleActive,
+                    RepeatMode = playback?.AutoRepeatMode,
+                    Position = timeline?.Position ?? TimeSpan.Zero,
+                    EndTime = timeline?.EndTime ?? TimeSpan.Zero,
+                    LastUpdatedTime = timeline?.LastUpdatedTime ?? DateTimeOffset.Now
                 };
 
-                if (props?.Thumbnail != null)
+                if (full || string.IsNullOrEmpty(_lastTrackId))
                 {
-                    try
+                    var props = await _currentSession.TryGetMediaPropertiesAsync();
+                    state.Title = props?.Title ?? string.Empty;
+                    state.Artist = props?.Artist ?? string.Empty;
+
+                    string trackId = $"{state.SourceApp}:{state.Title}:{state.Artist}";
+                    if (trackId != _lastTrackId)
                     {
-                        var stream = await props.Thumbnail.OpenReadAsync();
-                        if (stream != null)
+                        _lastTrackId = trackId;
+                        if (props?.Thumbnail != null)
                         {
-                            var bitmap = new BitmapImage();
-                            await bitmap.SetSourceAsync(stream);
-                            state.AlbumCover = bitmap;
+                            try
+                            {
+                                var stream = await props.Thumbnail.OpenReadAsync();
+                                if (stream != null)
+                                {
+                                    var bitmap = new BitmapImage();
+                                    await bitmap.SetSourceAsync(stream);
+                                    _cachedAlbumCover = bitmap;
+                                }
+                            }
+                            catch { _cachedAlbumCover = null; }
                         }
+                        else { _cachedAlbumCover = null; }
                     }
-                    catch
-                    {
-                    }
+                    
+                    state.AlbumCover = _cachedAlbumCover;
+                }
+                else
+                {
+                    // Reuse cached metadata for fast refresh
+                    state.Title = CurrentState.Title;
+                    state.Artist = CurrentState.Artist;
+                    state.AlbumCover = _cachedAlbumCover;
                 }
 
                 CurrentState = state;
             }
             catch
             {
-                CurrentState = MediaState.Empty;
+                // CurrentState = MediaState.Empty; // Don't wipe state on transient errors
             }
 
             StateChanged?.Invoke(CurrentState);
+        }
+
+        private static string FormatSourceApp(string aumid)
+        {
+            if (string.IsNullOrWhiteSpace(aumid)) return string.Empty;
+
+            // Strip .exe, handle common UWP/Win32 IDs
+            string name = aumid;
+            if (name.Contains("!", StringComparison.Ordinal))
+            {
+                name = name.Split('!')[0];
+            }
+            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                name = name[..^4];
+            }
+
+            // Capitalize first letter if needed
+            if (name.Length > 0 && char.IsLower(name[0]))
+            {
+                name = char.ToUpper(name[0]) + name[1..];
+            }
+
+            // Clean up common app names
+            return name switch
+            {
+                "Spotify" => "Spotify",
+                "Chrome" => "Google Chrome",
+                "Msedge" => "Microsoft Edge",
+                "Music.UI" => "Media Player",
+                _ => name
+            };
         }
 
         public async Task SendPlayPauseAsync()
@@ -243,12 +345,83 @@ namespace MenuBar.Services
             }
         }
 
+        public async Task ToggleShuffleAsync()
+        {
+            if (_currentSession != null)
+            {
+                try
+                {
+                    var info = _currentSession.GetPlaybackInfo();
+                    if (info?.IsShuffleActive != null)
+                    {
+                        await _currentSession.TryChangeShuffleActiveAsync(!info.IsShuffleActive.Value);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        public async Task ToggleRepeatAsync()
+        {
+            if (_currentSession != null)
+            {
+                try
+                {
+                    var info = _currentSession.GetPlaybackInfo();
+                    if (info?.AutoRepeatMode != null)
+                    {
+                        var current = info.AutoRepeatMode.Value;
+                        var next = current switch
+                        {
+                            Windows.Media.MediaPlaybackAutoRepeatMode.None =>
+                                Windows.Media.MediaPlaybackAutoRepeatMode.List,
+                            Windows.Media.MediaPlaybackAutoRepeatMode.List =>
+                                Windows.Media.MediaPlaybackAutoRepeatMode.Track,
+                            Windows.Media.MediaPlaybackAutoRepeatMode.Track =>
+                                Windows.Media.MediaPlaybackAutoRepeatMode.None,
+                            _ => Windows.Media.MediaPlaybackAutoRepeatMode.None
+                        };
+                        await _currentSession.TryChangeAutoRepeatModeAsync(next);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        public async Task SeekAsync(TimeSpan position)
+        {
+            if (_currentSession != null)
+            {
+                try
+                {
+                    var playback = _currentSession.GetPlaybackInfo();
+                    bool enabled = playback?.Controls?.IsPlaybackPositionEnabled == true;
+                    Debug.WriteLine($"[MediaService] SeekAsync called. Position: {position}, Enabled: {enabled}");
+
+                    if (enabled)
+                    {
+                        var result = await _currentSession.TryChangePlaybackPositionAsync(position.Ticks);
+                        Debug.WriteLine($"[MediaService] Seek result: {result}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MediaService] Seek failed with exception: {ex.Message}");
+                }
+            }
+            else
+            {
+                Debug.WriteLine("[MediaService] SeekAsync called but _currentSession is null.");
+            }
+        }
+
         public void Dispose()
         {
             AttachSession(null);
             if (_manager != null)
             {
                 _manager.CurrentSessionChanged -= OnCurrentSessionChanged;
+                _manager.SessionsChanged -= OnSessionsChanged;
             }
         }
     }

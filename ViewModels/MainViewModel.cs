@@ -110,6 +110,62 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _mediaArtist, value);
         }
 
+        private string _mediaSourceApp = "";
+        public string MediaSourceApp
+        {
+            get => _mediaSourceApp;
+            set => SetProperty(ref _mediaSourceApp, value);
+        }
+
+        private double _mediaShuffleOpacity = 0.5;
+        public double MediaShuffleOpacity
+        {
+            get => _mediaShuffleOpacity;
+            set => SetProperty(ref _mediaShuffleOpacity, value);
+        }
+
+        private string _mediaRepeatIcon = "\uE8EE";
+        public string MediaRepeatIcon
+        {
+            get => _mediaRepeatIcon;
+            set => SetProperty(ref _mediaRepeatIcon, value);
+        }
+
+        private double _mediaRepeatOpacity = 0.5;
+        public double MediaRepeatOpacity
+        {
+            get => _mediaRepeatOpacity;
+            set => SetProperty(ref _mediaRepeatOpacity, value);
+        }
+
+        private double _mediaPositionSeconds = 0;
+        public double MediaPositionSeconds
+        {
+            get => _mediaPositionSeconds;
+            set => SetProperty(ref _mediaPositionSeconds, value);
+        }
+
+        private double _mediaDurationSeconds = 1;
+        public double MediaDurationSeconds
+        {
+            get => _mediaDurationSeconds;
+            set => SetProperty(ref _mediaDurationSeconds, value);
+        }
+
+        private string _mediaPositionText = "0:00";
+        public string MediaPositionText
+        {
+            get => _mediaPositionText;
+            set => SetProperty(ref _mediaPositionText, value);
+        }
+
+        private string _mediaDurationText = "0:00";
+        public string MediaDurationText
+        {
+            get => _mediaDurationText;
+            set => SetProperty(ref _mediaDurationText, value);
+        }
+
         private ImageSource _mediaAlbumCover;
         public ImageSource MediaAlbumCover
         {

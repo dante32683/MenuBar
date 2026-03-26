@@ -28,7 +28,9 @@ Single-window app. `MainWindow.xaml` / `MainWindow.xaml.cs` coordinates all serv
 **Data flow — event-driven with minimal polling:**
 - Active window title: `SetWinEventHook` (`EVENT_SYSTEM_FOREGROUND` + `EVENT_OBJECT_NAMECHANGE`)
 - Virtual desktop: `SetWinEventHook` (`EVENT_SYSTEM_DESKTOPSWITCH`) + 1s clock timer poll (hook unreliable for AppBar windows)
-- Media: `MediaService` subscribes to `CurrentSessionChanged`, `MediaPropertiesChanged`, `PlaybackInfoChanged`
+- Media: `MediaService` subscribes to `CurrentSessionChanged`, `MediaPropertiesChanged`, `PlaybackInfoChanged`, and `TimelinePropertiesChanged`.
+- High-frequency update (100ms) toggles when the Media flyout is `Opened`/`Closed`.
+- Metadata and thumbnails are cached to avoid expensive I/O during progress updates.
 - Network: `NetworkInformation.NetworkStatusChanged`
 - Clock: `DispatcherTimer` every 1s
 - Battery: `Battery.AggregateBattery.ReportUpdated` event (instant, background thread → `DispatcherQueue.TryEnqueue`) + `DispatcherTimer` every 10s (fallback for power overlay changes)
@@ -97,6 +99,19 @@ Do not use `FindWindow("Shell_NotificationCenter", ...)` or snapshot state in `P
 ## Configuration
 
 `settings.json` next to the executable controls visibility, `bar_height` (28–56px), clock format, accent color. Copied to output with `PreserveNewest`. Scaling ViewModel properties (`HostCornerRadius`, `HostPadding`, `BatteryIconWidth`, `IconFontSize`, `TextFontSize`) are recomputed in `LoadSettings()` from `bar_height`.
+
+## Development Process
+
+Before starting any task, follow this strict **Research -> Strategy -> Execution** cycle:
+
+1.  **Phase-Based Planning:** Break features or fixes into explicit, logical phases.
+2.  **Audit:** Audit the entire plan for correctness, stability, and WinUI 3 constraints before implementation.
+3.  **Phase-by-Phase Execution:**
+    - Implement exactly one phase at a time.
+    - **Verify:** After each phase, manually review all code changes for accuracy.
+    - **Build:** Run `dotnet build` after every phase.
+    - **Gate:** Fix any compilation errors **BEFORE** moving to the next phase.
+4.  **Finalization:** Only publish (generate `publish/` folders) after all phases are complete and the final build is successful.
 
 ## Key Constraints
 

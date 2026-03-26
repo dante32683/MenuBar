@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Windows.Devices.Power;
 using Windows.Networking.Connectivity;
@@ -8,6 +9,9 @@ namespace MenuBar.Services
 {
     public class HardwareService
     {
+        private readonly Queue<int> _chargeRateHistory = new Queue<int>();
+        private const int MaxChargeRateHistory = 6;
+
         public class BatteryInfo
         {
             public bool HasBattery { get; set; }
@@ -17,6 +21,7 @@ namespace MenuBar.Services
             public bool PluggedIn { get; set; }
             public bool EnergySaverOn { get; set; }
             public int? SecondsRemaining { get; set; }
+            public int? AverageChargeRateInMilliwatts { get; set; }
         }
 
         public class NetworkInfo
@@ -53,6 +58,21 @@ namespace MenuBar.Services
                     info.IsCalculating = status.BatteryLifePercent == byte.MaxValue;
                     info.Percent = info.IsCalculating ? 0 : status.BatteryLifePercent;
                     var batteryReport = Battery.AggregateBattery.GetReport();
+                    
+                    if (batteryReport.ChargeRateInMilliwatts.HasValue)
+                    {
+                        _chargeRateHistory.Enqueue(batteryReport.ChargeRateInMilliwatts.Value);
+                        while (_chargeRateHistory.Count > MaxChargeRateHistory)
+                        {
+                            _chargeRateHistory.Dequeue();
+                        }
+                        
+                        if (_chargeRateHistory.Count > 0)
+                        {
+                            info.AverageChargeRateInMilliwatts = (int)_chargeRateHistory.Average();
+                        }
+                    }
+                    
                     // Lenovo conservation mode keeps Status=Charging but ChargeRateInMilliwatts=0.
                     // Use actual current flow as ground truth when available; fall back to status flag otherwise.
                     info.Charging = batteryReport.ChargeRateInMilliwatts.HasValue
