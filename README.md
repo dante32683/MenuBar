@@ -2,14 +2,16 @@
 
 A macOS-style menu bar for Windows. Built with WinUI 3.
 
-Sits at the top of your screen and shows the active window title, media controls, network/battery info, and a clock. Click on any section to get more details in a dropdown.
+Sits at the top of your screen and shows the active window title, app menus, media controls, network/battery info, and a clock. Click on most sections to get more details in a dropdown.
 
 ## What's on the bar
 
-- Active window title
+- Active window title & icon
+- App menus (File, Edit, etc. for supported apps)
 - Media controls (play/pause, track info)
 - Network info (SSID, signal, speed)
 - Battery percentage
+- Virtual desktop name
 - Clock (tap it to open Notification Center)
 
 ## Running it
@@ -30,16 +32,25 @@ Needs .NET 8 and Windows App SDK 1.5. Windows 10 1809 or newer.
 
 ## Settings
 
-Edit `settings.json` next to the exe. Right-click the bar > Reload Settings to apply changes.
+Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** to apply changes.
 
 | Key | Default | What it does |
 |-----|---------|--------------|
 | `bar_height` | `28` | Height in px (28–56) |
 | `show_title` | `true` | Show window title |
+| `show_app_menu` | `false` | Show the app's menus (File, Edit, etc.) |
 | `show_media` | `true` | Show media controls |
 | `show_network` | `true` | Show network info |
 | `show_battery` | `true` | Show battery |
 | `show_clock` | `true` | Show clock |
+| `show_virtual_desktop` | `false` | Show the current virtual desktop name |
 | `show_windows_logo` | `false` | Show a Windows logo on the left |
 | `clock_24h` | `false` | Use 24h time |
+| `clock_show_seconds` | `false` | Show seconds in the clock |
+| `clock_show_date` | `true` | Show the date |
+| `clock_date_format` | `"MM/dd/yyyy"` | Format for the date |
 | `use_accent_color` | `true` | Tint bar with your accent color |
+| `title_max_length` | `0` | Max characters for title (0 = no limit) |
+| `media_max_length` | `0` | Max characters for media (0 = no limit) |
+| `font_size_text` | `0` | Manual text size (0 = auto) |
+| `font_size_icon` | `0` | Manual icon size (0 = auto) |
