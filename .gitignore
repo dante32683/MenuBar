@@ -17,5 +17,6 @@ ARM64/
 *.vscode/
 *.sln
 
-# Claude Code
+# AI Code
 .claude/
+GEMINI.md
