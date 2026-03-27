@@ -826,58 +826,122 @@ namespace MenuBar
         {
             if (!_batteryInfo.HasBattery)
             {
-                BatteryFlyoutPercent.Text = "AC Power";
-                BatteryFlyoutStatus.Text = "No battery detected";
-                BatteryFlyoutIcon.Text = "\uEC02";
-                BatteryFlyoutIcon.Foreground = _batteryDefaultBrush;
-                BatteryFlyoutTime.Visibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutPercent = "AC Power";
+                ViewModel.BatteryFlyoutStatus = "No battery detected";
+                ViewModel.BatteryFlyoutTimeVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutWattageVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
                 return;
             }
 
             if (_batteryInfo.IsCalculating)
             {
-                BatteryFlyoutPercent.Text = "--%";
-                BatteryFlyoutStatus.Text = "Calculating...";
-                BatteryFlyoutIcon.Text = MobileBatteryGlyphs[5];
-                BatteryFlyoutIcon.Foreground = _batteryDefaultBrush;
-                BatteryFlyoutTime.Visibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutPercent = "--%";
+                ViewModel.BatteryFlyoutStatus = "Calculating...";
+                ViewModel.BatteryFlyoutTimeVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutWattageVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
                 return;
             }
 
-            BatteryFlyoutPercent.Text = $"{_batteryInfo.Percent}%";
-            BatteryFlyoutStatus.Text = _batteryInfo.Charging
+            ViewModel.BatteryFlyoutPercent = $"{_batteryInfo.Percent}%";
+            ViewModel.BatteryFlyoutStatus = _batteryInfo.Charging
                 ? "Charging"
                 : (_batteryInfo.PluggedIn
                     ? (_batteryInfo.Percent >= 99 ? "Plugged in, fully charged" : "Smart charging")
                     : "On battery power");
-            BatteryFlyoutIcon.Text = GetBatteryFillGlyph(_batteryInfo.Percent);
-            BatteryFlyoutIcon.Foreground = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn, _batteryInfo.EnergySaverOn);
 
+            // Time remaining
             string remaining = FormatRemainingTime(_batteryInfo.SecondsRemaining);
             if (string.IsNullOrWhiteSpace(remaining))
             {
-                BatteryFlyoutTime.Visibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutTimeVisibility = Visibility.Collapsed;
             }
             else
             {
-                BatteryFlyoutTime.Text = remaining;
-                BatteryFlyoutTime.Visibility = Visibility.Visible;
+                ViewModel.BatteryFlyoutTime = remaining;
+                ViewModel.BatteryFlyoutTimeVisibility = Visibility.Visible;
             }
 
+            // Wattage Flow logic
             if (_batteryInfo.AverageChargeRateInMilliwatts.HasValue && _batteryInfo.AverageChargeRateInMilliwatts.Value != 0)
             {
-                double watts = _batteryInfo.AverageChargeRateInMilliwatts.Value / 1000.0;
-                string chargeRateLabel = _batteryInfo.AverageChargeRateInMilliwatts.Value > 0 ? "Charging at" : "Discharging at";
-                BatteryFlyoutChargeRate.Text = $"{chargeRateLabel} {Math.Abs(watts):F1}W (1m avg)";
-                BatteryFlyoutChargeRate.Visibility = Visibility.Visible;
-                // Adjust margin if time remaining is also visible
-                BatteryFlyoutChargeRate.Margin = BatteryFlyoutTime.Visibility == Visibility.Visible
-                    ? new Thickness(0, 25, 0, 0)
-                    : new Thickness(0, 10, 0, 0);
+                double watts = Math.Abs(_batteryInfo.AverageChargeRateInMilliwatts.Value / 1000.0);
+                bool isCharging = _batteryInfo.AverageChargeRateInMilliwatts.Value > 0;
+                
+                ViewModel.BatteryFlyoutWattage = $"{watts:F1}W";
+                ViewModel.BatteryFlyoutWattageIcon = isCharging ? "\uE74A" : "\uE74B"; // Up / Down
+
+                Windows.UI.Color wattageColor;
+                if (isCharging)
+                {
+                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B); // green
+                }
+                else if (watts < 9.0)
+                {
+                    wattageColor = Microsoft.UI.Colors.White;
+                }
+                else if (watts <= 15.0)
+                {
+                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0xEA, 0xA3, 0x00); // amber #EAA300
+                }
+                else
+                {
+                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0xC4, 0x2B, 0x1C); // red
+                }
+                ViewModel.BatteryFlyoutWattageBrush = new SolidColorBrush(wattageColor);
+                ViewModel.BatteryFlyoutWattageVisibility = Visibility.Visible;
             }
             else
             {
-                BatteryFlyoutChargeRate.Visibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutWattageVisibility = Visibility.Collapsed;
+            }
+
+            // Projected Runtime logic
+            if (_settings.ShowProjectedRuntime && _batteryInfo.HasBattery && !_batteryInfo.PluggedIn && 
+                _batteryInfo.AverageChargeRateInMilliwatts.HasValue && _batteryInfo.AverageChargeRateInMilliwatts.Value < 0)
+            {
+                int absWatts = Math.Abs(_batteryInfo.AverageChargeRateInMilliwatts.Value);
+                if (absWatts > 0 && _batteryInfo.FullChargeCapacityInMilliwattHours.HasValue)
+                {
+                    double hours = (double)_batteryInfo.FullChargeCapacityInMilliwattHours.Value / absWatts;
+                    int totalMinutes = (int)(hours * 60);
+                    int h = totalMinutes / 60;
+                    int m = totalMinutes % 60;
+                    
+                    string projectedStr = h > 0 ? $"{h}h {m}m" : $"{m}m";
+                    ViewModel.BatteryFlyoutProjected = $"Full charge: {projectedStr}";
+                    ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Visible;
+                }
+                else
+                {
+                    ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
+                }
+            }
+            else if (_settings.ShowProjectedRuntime && _batteryInfo.HasBattery && _batteryInfo.Charging && 
+                     _batteryInfo.AverageChargeRateInMilliwatts.HasValue && _batteryInfo.AverageChargeRateInMilliwatts.Value > 0 &&
+                     _batteryInfo.FullChargeCapacityInMilliwattHours.HasValue && _batteryInfo.RemainingCapacityInMilliwattHours.HasValue)
+            {
+                int neededMWh = _batteryInfo.FullChargeCapacityInMilliwattHours.Value - _batteryInfo.RemainingCapacityInMilliwattHours.Value;
+                if (neededMWh > 0)
+                {
+                    double hoursToFull = (double)neededMWh / _batteryInfo.AverageChargeRateInMilliwatts.Value;
+                    int totalMinutes = (int)(hoursToFull * 60);
+                    int h = totalMinutes / 60;
+                    int m = totalMinutes % 60;
+                    
+                    string timeStr = h > 0 ? $"{h}h {m}m" : $"{m}m";
+                    ViewModel.BatteryFlyoutProjected = $"Projected until full: {timeStr}";
+                    ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Visible;
+                }
+                else
+                {
+                    ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
             }
         }
 
@@ -958,9 +1022,13 @@ namespace MenuBar
 
         private void BatteryHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
+            ToggleAttachedFlyout(GetHostBorder(sender));
+        }
+
+        private void BatteryFlyout_Opened(object sender, object e)
+        {
             UpdateBattery();
             UpdateBatteryFlyout();
-            ToggleAttachedFlyout(GetHostBorder(sender));
         }
 
         private void VirtualDesktopHost_PointerEntered(object sender, PointerRoutedEventArgs e)

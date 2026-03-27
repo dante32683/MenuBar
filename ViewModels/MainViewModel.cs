@@ -272,6 +272,77 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _batteryIconWidth, value);
         }
 
+        // Battery Flyout Properties
+        private string _batteryFlyoutPercent = "100%";
+        public string BatteryFlyoutPercent
+        {
+            get => _batteryFlyoutPercent;
+            set => SetProperty(ref _batteryFlyoutPercent, value);
+        }
+
+        private string _batteryFlyoutStatus = "On battery";
+        public string BatteryFlyoutStatus
+        {
+            get => _batteryFlyoutStatus;
+            set => SetProperty(ref _batteryFlyoutStatus, value);
+        }
+
+        private string _batteryFlyoutTime = "";
+        public string BatteryFlyoutTime
+        {
+            get => _batteryFlyoutTime;
+            set => SetProperty(ref _batteryFlyoutTime, value);
+        }
+
+        private string _batteryFlyoutWattage = "";
+        public string BatteryFlyoutWattage
+        {
+            get => _batteryFlyoutWattage;
+            set => SetProperty(ref _batteryFlyoutWattage, value);
+        }
+
+        private string _batteryFlyoutWattageIcon = "";
+        public string BatteryFlyoutWattageIcon
+        {
+            get => _batteryFlyoutWattageIcon;
+            set => SetProperty(ref _batteryFlyoutWattageIcon, value);
+        }
+
+        private Brush _batteryFlyoutWattageBrush;
+        public Brush BatteryFlyoutWattageBrush
+        {
+            get => _batteryFlyoutWattageBrush;
+            set => SetProperty(ref _batteryFlyoutWattageBrush, value);
+        }
+
+        private Visibility _batteryFlyoutWattageVisibility = Visibility.Collapsed;
+        public Visibility BatteryFlyoutWattageVisibility
+        {
+            get => _batteryFlyoutWattageVisibility;
+            set => SetProperty(ref _batteryFlyoutWattageVisibility, value);
+        }
+
+        private string _batteryFlyoutProjected = "";
+        public string BatteryFlyoutProjected
+        {
+            get => _batteryFlyoutProjected;
+            set => SetProperty(ref _batteryFlyoutProjected, value);
+        }
+
+        private Visibility _batteryFlyoutProjectedVisibility = Visibility.Collapsed;
+        public Visibility BatteryFlyoutProjectedVisibility
+        {
+            get => _batteryFlyoutProjectedVisibility;
+            set => SetProperty(ref _batteryFlyoutProjectedVisibility, value);
+        }
+
+        private Visibility _batteryFlyoutTimeVisibility = Visibility.Collapsed;
+        public Visibility BatteryFlyoutTimeVisibility
+        {
+            get => _batteryFlyoutTimeVisibility;
+            set => SetProperty(ref _batteryFlyoutTimeVisibility, value);
+        }
+
         private string _virtualDesktopText = "Desktop 1";
         public string VirtualDesktopText
         {

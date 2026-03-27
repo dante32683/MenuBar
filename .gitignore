@@ -20,3 +20,5 @@ ARM64/
 # AI Code
 .claude/
 GEMINI.md
+
+.env

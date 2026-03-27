@@ -46,6 +46,7 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 | `show_media` | `true` | Show media controls |
 | `show_network` | `true` | Show network info |
 | `show_battery` | `true` | Show battery |
+| `show_projected_runtime` | `true` | Show estimated battery time remaining based on wattage |
 | `show_clock` | `true` | Show clock |
 | `show_virtual_desktop` | `false` | Show the current virtual desktop name |
 | `show_windows_logo` | `false` | Show a Windows logo on the left |

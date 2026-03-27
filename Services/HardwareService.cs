@@ -22,6 +22,8 @@ namespace MenuBar.Services
             public bool EnergySaverOn { get; set; }
             public int? SecondsRemaining { get; set; }
             public int? AverageChargeRateInMilliwatts { get; set; }
+            public int? RemainingCapacityInMilliwattHours { get; set; }
+            public int? FullChargeCapacityInMilliwattHours { get; set; }
         }
 
         public class NetworkInfo
@@ -58,6 +60,8 @@ namespace MenuBar.Services
                     info.IsCalculating = status.BatteryLifePercent == byte.MaxValue;
                     info.Percent = info.IsCalculating ? 0 : status.BatteryLifePercent;
                     var batteryReport = Battery.AggregateBattery.GetReport();
+                    info.RemainingCapacityInMilliwattHours = batteryReport.RemainingCapacityInMilliwattHours;
+                    info.FullChargeCapacityInMilliwattHours = batteryReport.FullChargeCapacityInMilliwattHours;
                     
                     if (batteryReport.ChargeRateInMilliwatts.HasValue)
                     {

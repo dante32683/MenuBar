@@ -75,6 +75,19 @@ Do not use negative right margins on StackPanel items to extend hit areas — th
 4. Discharging ≤ 20% → Amber `#EAA300`
 5. Normal discharging → White
 
+**Projected Runtime:**
+Calculated as `[Full Charge Capacity (Wh)] / [1m Rolling Average Wattage (W)]` using `FullChargeCapacityInMilliwattHours` and `AverageChargeRateInMilliwatts` from `HardwareService`.
+- **Discharging:** Shown as "Full charge: Xh Ym".
+- **Charging:** Shown as "Projected until full: Xh Ym".
+- **Smoothing:** Uses a 1-minute rolling average (6 samples @ 10s) to stabilize estimates.
+
+**Flyout layout (redesigned):**
+The battery flyout uses a two-row `Grid` (`Padding="20"`, `CornerRadius="12"`). Top row: battery icon (Segoe Fluent Icons, 38pt, tinted to match bar fill color via `{x:Bind BatteryFillGlyphText.Foreground}`) paired with a right column `StackPanel` containing:
+- A horizontal `StackPanel` with the percentage (34pt SemiBold) and a compact wattage chip (icon + value, baseline-aligned at `VerticalAlignment="Bottom"`, `Margin="12,0,0,8"`).
+- Status text (14pt, `TextFillColorSecondaryBrush`) below.
+
+Bottom row: a `StackPanel` (`Spacing="10"`, `Margin="0,16,0,0"`) with time-remaining and projected-runtime `TextBlock`s, each bound to a `Visibility` property. Wattage chip uses `\uE74A` (Up) for charging and `\uE74B` (Down) for discharging. Color tiers: charging → `#6AC45B` green; discharging < 9 W → white; 9–15 W → `#EAA300` amber (same as low-battery bar); > 15 W → `#C42B1C` red. The flyout uses a `Flyout.Opened` event (`BatteryFlyout_Opened`) that calls `UpdateBattery()` + `UpdateBatteryFlyout()` to force a fresh 1m rolling average sample at open time. All flyout state is driven by `MainViewModel` properties (`BatteryFlyoutPercent`, `BatteryFlyoutStatus`, `BatteryFlyoutWattage`, `BatteryFlyoutWattageIcon`, `BatteryFlyoutWattageBrush`, `BatteryFlyoutWattageVisibility`, `BatteryFlyoutTime`, `BatteryFlyoutTimeVisibility`, `BatteryFlyoutProjected`, `BatteryFlyoutProjectedVisibility`) populated by `UpdateBatteryFlyout()` in `MainWindow.xaml.cs`. No `x:Name` procedural manipulation in the flyout.
+
 `EnergySaverOn` is true when either `SYSTEM_POWER_STATUS.SystemStatusFlag == 1` (Windows Battery Saver) OR `PowerGetEffectiveOverlayScheme` returns `961cc777-2547-4f9d-8174-7d86181b8a7a` (Power Saver overlay / Power Mode slider leftmost). Do NOT use `Windows.System.Power.PowerManager.EnergySaverStatus` — it throws in unpackaged apps. `SystemStatusFlag` alone also does not reflect the Power Mode overlay. Prefer `ChargeRateInMilliwatts > 0` for charging detection; some Lenovo drivers misreport `BatteryFlag & 8`. Do not use `GetSystemPowerStatus.BatteryFlag & 8` alone.
 
 ## Virtual Desktop Widget

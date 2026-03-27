@@ -49,6 +49,9 @@ namespace MenuBar.Services
         [JsonPropertyName("clock_date_format")]
         public string ClockDateFormat { get; set; } = "MM/dd/yyyy";
 
+        [JsonPropertyName("show_projected_runtime")]
+        public bool ShowProjectedRuntime { get; set; } = true;
+
         [JsonPropertyName("font_size_text")]
         public double FontSizeText { get; set; } = 0;
 
