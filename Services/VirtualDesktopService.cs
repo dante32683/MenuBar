@@ -11,11 +11,6 @@ namespace MenuBar.Services
         private static readonly NativeMethods.IVirtualDesktopManager _manager =
             (NativeMethods.IVirtualDesktopManager)new NativeMethods.VirtualDesktopManager();
 
-        /// <summary>
-        /// Returns the current virtual desktop's display name ("Work", "Desktop 2", etc.).
-        /// Prefers IVirtualDesktopManager to identify which desktop a window is on,
-        /// then falls back to Registry for the user-defined name or ordinal.
-        /// </summary>
         public static string GetCurrentDesktopLabel(IntPtr hwnd)
         {
             try

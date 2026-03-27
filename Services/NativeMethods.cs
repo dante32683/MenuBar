@@ -28,6 +28,13 @@ namespace MenuBar.Services
         public const int WS_EX_TOOLWINDOW = 0x00000080;
         public const int WS_EX_APPWINDOW = 0x00040000;
 
+        // ShowWindow commands
+        public const int SW_HIDE = 0;
+        public const int SW_SHOWNA = 8;
+
+        // Monitor
+        public const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+
         // Keyboard
         public const int KEYEVENTF_KEYUP = 0x0002;
         public const byte VK_LWIN = 0x5B;
@@ -169,6 +176,15 @@ namespace MenuBar.Services
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct SYSTEM_POWER_STATUS
         {
             public byte ACLineStatus;
@@ -219,6 +235,21 @@ namespace MenuBar.Services
 
         [DllImport("powrprof.dll")]
         public static extern uint PowerGetEffectiveOverlayScheme(out Guid EffectiveOverlayGuid);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         [DllImport("user32.dll")]
         public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);

@@ -78,6 +78,7 @@ namespace MenuBar
         private uint _taskbarCreatedMsg;
         private NativeMethods.SUBCLASSPROC _subclassProc;
         private bool _isDraggingSlider;
+        private bool _isFullscreenActive;
 
         private sealed class AppMenuItem
         {
@@ -94,7 +95,6 @@ namespace MenuBar
             _mediaService = new MediaService(DispatcherQueue);
             Closed += Window_Closed;
 
-            // Register shell messages and subclass window for system events
             _taskbarCreatedMsg = NativeMethods.RegisterWindowMessage("TaskbarCreated");
             _subclassProc = NewWindowProc;
             NativeMethods.SetWindowSubclass(_hwnd, _subclassProc, 0, IntPtr.Zero);
@@ -125,17 +125,15 @@ namespace MenuBar
         {
             if (uMsg == _taskbarCreatedMsg)
             {
-                // Explorer restarted — re-register AppBar to restore docking
-                RegisterOrUpdateAppBar(registerIfNeeded: true);
+                if (!_isFullscreenActive) // skip re-registration while hidden for fullscreen
+                    RegisterOrUpdateAppBar(registerIfNeeded: true);
             }
             else if (uMsg == NativeMethods.WM_DPICHANGED)
             {
-                // DPI changed (e.g. moved between monitors) — recalculate physical layout
                 RegisterOrUpdateAppBar(registerIfNeeded: false);
             }
             else if (uMsg == NativeMethods.WM_DISPLAYCHANGE)
             {
-                // Resolution or monitor count changed — verify bar bounds
                 RegisterOrUpdateAppBar(registerIfNeeded: false);
             }
 
@@ -185,15 +183,10 @@ namespace MenuBar
 
         private void RegisterOrUpdateAppBar(bool registerIfNeeded)
         {
-            // Use DisplayArea to find the monitor where our window is (or should be).
-            // This is much more reliable on multi-monitor setups than SM_XVIRTUALSCREEN.
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
             var displayArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary);
-            
             var monitorBounds = displayArea.OuterBounds;
-            var workArea = displayArea.WorkArea;
 
-            // barHeight is in DIPs (logical pixels) as configured by the user.
             int barHeight = _settings.GetEffectiveBarHeight();
             uint dpi = NativeMethods.GetDpiForWindow(_hwnd);
             double dpiScale = dpi > 0 ? dpi / 96.0 : 1.0;
@@ -212,22 +205,18 @@ namespace MenuBar
                 _appBarRegistered = true;
             }
 
-            // Target the specific monitor's bounds in virtual screen coordinates
             abd.rc.left = monitorBounds.X;
             abd.rc.top = monitorBounds.Y;
             abd.rc.right = monitorBounds.X + monitorBounds.Width;
             abd.rc.bottom = monitorBounds.Y + physBarHeight;
 
             NativeMethods.SHAppBarMessage(NativeMethods.ABM_QUERYPOS, ref abd);
-            // Re-assert our desired height in case QUERYPOS moved it
-            abd.rc.bottom = abd.rc.top + physBarHeight;
+            abd.rc.bottom = abd.rc.top + physBarHeight; // re-assert desired height in case QUERYPOS moved it
             NativeMethods.SHAppBarMessage(NativeMethods.ABM_SETPOS, ref abd);
 
-            // XAML properties are in DIPs
             BackgroundBorder.Height = barHeight;
             MainContentGrid.Height = barHeight;
 
-            // Final window placement on the correct monitor
             NativeMethods.SetWindowPos(
                 _hwnd,
                 (IntPtr)NativeMethods.HWND_TOPMOST,
@@ -245,7 +234,12 @@ namespace MenuBar
         private void SetupTimers()
         {
             _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _clockTimer.Tick += (_, _) => { UpdateClock(); UpdateVirtualDesktop(); };
+            _clockTimer.Tick += (_, _) =>
+            {
+                UpdateClock();
+                UpdateVirtualDesktop();
+                CheckAndApplyFullscreenState(NativeMethods.GetForegroundWindow());
+            };
             _clockTimer.Start();
 
             _batteryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
@@ -287,6 +281,8 @@ namespace MenuBar
         {
             if (hwnd != IntPtr.Zero && hwnd != _hwnd)
                 _lastExternalForegroundHwnd = hwnd;
+            if (hwnd != IntPtr.Zero)
+                CheckAndApplyFullscreenState(hwnd);
             UpdateActiveWindow();
             // UpdateVirtualDesktop is NOT called here — CurrentVirtualDesktop only changes
             // on desktop switches, which are handled by OnDesktopSwitchEvent exclusively.
@@ -306,6 +302,60 @@ namespace MenuBar
             {
                 UpdateActiveWindow();
             }
+        }
+
+        private bool IsWindowFullscreen(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero || hwnd == _hwnd) return false;
+            if (!NativeMethods.GetWindowRect(hwnd, out NativeMethods.RECT windowRect)) return false;
+
+            IntPtr hMonitor = NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MONITOR_DEFAULTTONEAREST);
+            IntPtr barMonitor = NativeMethods.MonitorFromWindow(_hwnd, NativeMethods.MONITOR_DEFAULTTONEAREST);
+            if (hMonitor != barMonitor) return false;
+
+            NativeMethods.MONITORINFO monInfo = new NativeMethods.MONITORINFO
+            {
+                cbSize = Marshal.SizeOf<NativeMethods.MONITORINFO>()
+            };
+            if (!NativeMethods.GetMonitorInfo(hMonitor, ref monInfo)) return false;
+
+            return windowRect.left <= monInfo.rcMonitor.left &&
+                   windowRect.top <= monInfo.rcMonitor.top &&
+                   windowRect.right >= monInfo.rcMonitor.right &&
+                   windowRect.bottom >= monInfo.rcMonitor.bottom;
+        }
+
+        private void CheckAndApplyFullscreenState(IntPtr hwnd)
+        {
+            bool isFullscreen = IsWindowFullscreen(hwnd);
+            if (isFullscreen == _isFullscreenActive) return;
+
+            _isFullscreenActive = isFullscreen;
+            if (isFullscreen)
+                HideBarForFullscreen();
+            else
+                ShowBarAfterFullscreen();
+        }
+
+        private void HideBarForFullscreen()
+        {
+            if (_appBarRegistered)
+            {
+                NativeMethods.APPBARDATA abd = new NativeMethods.APPBARDATA
+                {
+                    cbSize = Marshal.SizeOf<NativeMethods.APPBARDATA>(),
+                    hWnd = _hwnd
+                };
+                NativeMethods.SHAppBarMessage(NativeMethods.ABM_REMOVE, ref abd);
+                _appBarRegistered = false;
+            }
+            NativeMethods.ShowWindow(_hwnd, NativeMethods.SW_HIDE);
+        }
+
+        private void ShowBarAfterFullscreen()
+        {
+            NativeMethods.ShowWindow(_hwnd, NativeMethods.SW_SHOWNA);
+            RegisterOrUpdateAppBar(registerIfNeeded: true);
         }
 
         private void OnNetworkStatusChanged(object sender)
@@ -367,7 +417,6 @@ namespace MenuBar
             ViewModel.ClockVisibility = ToVisibility(_settings.ShowClock);
             ViewModel.VirtualDesktopVisibility = ToVisibility(_settings.ShowVirtualDesktop);
             AppMenuPanel.Visibility = ToVisibility(_settings.ShowAppMenu);
-            ViewModel.LogoTooltip = "Power and system menu";
 
             int barHeight = _settings.GetEffectiveBarHeight();
             ViewModel.IconFontSize = _settings.FontSizeIcon > 0 ? _settings.FontSizeIcon : barHeight * 0.62;
@@ -770,11 +819,7 @@ namespace MenuBar
                 ViewModel.MediaRepeatOpacity = state.RepeatMode == Windows.Media.MediaPlaybackAutoRepeatMode.None ? 0.5 : 1.0;
                 ViewModel.MediaRepeatIcon = state.RepeatMode == Windows.Media.MediaPlaybackAutoRepeatMode.Track ? "\uE8ED" : "\uE8EE";
 
-                if (_isDraggingSlider)
-                {
-                    // User is dragging: text already set by ValueChanged, don't touch slider
-                }
-                else
+                if (!_isDraggingSlider)
                 {
                     TimeSpan currentPos = state.Position;
                     if (state.Playing)
@@ -1221,8 +1266,6 @@ namespace MenuBar
             _mediaService.SuppressUpdates = false;
         }
 
-        // When a host widget uses a transparent outer Grid for Fitts's Law hit-test expansion,
-        // the sender is a Grid; find the first Border child which carries the squircle background.
         private static Border GetHostBorder(object sender)
         {
             if (sender is Border b) return b;

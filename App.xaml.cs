@@ -14,11 +14,8 @@ namespace MenuBar
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-            // Simple runtime check for compatibility
             if (!IsWindowsVersionSupported(17763))
             {
-                // In a real app, we might show a message box here, 
-                // but for a portable utility, we'll just exit gracefully.
                 Exit();
                 return;
             }

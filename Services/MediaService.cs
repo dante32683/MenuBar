@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
@@ -115,8 +114,6 @@ namespace MenuBar.Services
             _dispatcher.TryEnqueue(() =>
             {
                 var best = FindBestSession();
-                
-                // Only switch if the session is actually different
                 if (best?.SourceAppUserModelId != _currentSession?.SourceAppUserModelId)
                 {
                     AttachSession(best);
@@ -255,7 +252,6 @@ namespace MenuBar.Services
                 }
                 else
                 {
-                    // Reuse cached metadata for fast refresh
                     state.Title = CurrentState.Title;
                     state.Artist = CurrentState.Artist;
                     state.AlbumCover = _cachedAlbumCover;
@@ -263,10 +259,7 @@ namespace MenuBar.Services
 
                 CurrentState = state;
             }
-            catch
-            {
-                // CurrentState = MediaState.Empty; // Don't wipe state on transient errors
-            }
+            catch { }
 
             StateChanged?.Invoke(CurrentState);
         }
@@ -275,24 +268,14 @@ namespace MenuBar.Services
         {
             if (string.IsNullOrWhiteSpace(aumid)) return string.Empty;
 
-            // Strip .exe, handle common UWP/Win32 IDs
             string name = aumid;
             if (name.Contains("!", StringComparison.Ordinal))
-            {
                 name = name.Split('!')[0];
-            }
             if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            {
                 name = name[..^4];
-            }
-
-            // Capitalize first letter if needed
             if (name.Length > 0 && char.IsLower(name[0]))
-            {
                 name = char.ToUpper(name[0]) + name[1..];
-            }
 
-            // Clean up common app names
             return name switch
             {
                 "Spotify" => "Spotify",
@@ -390,29 +373,14 @@ namespace MenuBar.Services
 
         public async Task SeekAsync(TimeSpan position)
         {
-            if (_currentSession != null)
+            if (_currentSession == null) return;
+            try
             {
-                try
-                {
-                    var playback = _currentSession.GetPlaybackInfo();
-                    bool enabled = playback?.Controls?.IsPlaybackPositionEnabled == true;
-                    Debug.WriteLine($"[MediaService] SeekAsync called. Position: {position}, Enabled: {enabled}");
-
-                    if (enabled)
-                    {
-                        var result = await _currentSession.TryChangePlaybackPositionAsync(position.Ticks);
-                        Debug.WriteLine($"[MediaService] Seek result: {result}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[MediaService] Seek failed with exception: {ex.Message}");
-                }
+                var playback = _currentSession.GetPlaybackInfo();
+                if (playback?.Controls?.IsPlaybackPositionEnabled == true)
+                    await _currentSession.TryChangePlaybackPositionAsync(position.Ticks);
             }
-            else
-            {
-                Debug.WriteLine("[MediaService] SeekAsync called but _currentSession is null.");
-            }
+            catch { }
         }
 
         public void Dispose()
