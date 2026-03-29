@@ -20,7 +20,7 @@
                 <Setter Property="Width" Value="36" />
                 <Setter Property="Height" Value="36" />
                 <Setter Property="Padding" Value="0" />
-                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
             </Style>
 
             <Style x:Key="MediaProgressSliderStyle" TargetType="Slider">
@@ -30,11 +30,12 @@
             </Style>
 
             <!-- The brush is only a tint layer; the actual blur comes from Flyout/SystemBackdrop. -->
+            <!-- Neutral dark tint matches Windows 11 native flyouts (Quick Settings, Volume, etc.) -->
             <AcrylicBrush x:Key="FlyoutAcrylicBackground"
-                          TintColor="{StaticResource SystemAccentColorDark2}"
-                          TintOpacity="0.6"
-                          TintLuminosityOpacity="0.8"
-                          FallbackColor="{StaticResource SystemAccentColorDark2}" />
+                          TintColor="#202020"
+                          TintOpacity="0.85"
+                          TintLuminosityOpacity="0.9"
+                          FallbackColor="#2C2C2C" />
         </Grid.Resources>
 
         <Grid.ContextFlyout>
@@ -129,7 +130,7 @@
 
                     <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitle, Mode=OneWay}"
                                Visibility="{x:Bind ViewModel.TitleVisibility, Mode=OneWay}"
-                               Foreground="White"
+                               Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                FontFamily="Segoe UI Variable, Segoe UI"
                                FontWeight="SemiBold"
                                FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
@@ -175,7 +176,7 @@
                                     <Style TargetType="FlyoutPresenter">
                                         <Setter Property="Padding" Value="0" />
                                         <Setter Property="MinWidth" Value="300" />
-                                        <Setter Property="CornerRadius" Value="8" />
+                                        <Setter Property="CornerRadius" Value="{ThemeResource OverlayCornerRadius}" />
                                         <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
                                     </Style>
                                 </Flyout.FlyoutPresenterStyle>
@@ -213,7 +214,6 @@
                                                        FontFamily="Segoe UI Variable, Segoe UI"
                                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                        FontSize="11"
-                                                       FontStyle="Italic"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxWidth="180" />
                                         </StackPanel>
@@ -282,7 +282,7 @@
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                        MaxWidth="210"
                                        TextTrimming="CharacterEllipsis"
-                                       Foreground="White"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
@@ -314,7 +314,7 @@
                                     <Style TargetType="FlyoutPresenter">
                                         <Setter Property="Padding" Value="0" />
                                         <Setter Property="MinWidth" Value="260" />
-                                        <Setter Property="CornerRadius" Value="8" />
+                                        <Setter Property="CornerRadius" Value="{ThemeResource OverlayCornerRadius}" />
                                         <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
                                     </Style>
                                 </Flyout.FlyoutPresenterStyle>
@@ -332,7 +332,7 @@
                                                    Text="&#xE701;"
                                                    FontFamily="Segoe Fluent Icons"
                                                    FontSize="36"
-                                                   Foreground="White"
+                                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,14,0" />
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
@@ -341,7 +341,7 @@
                                                        FontFamily="Segoe UI Variable, Segoe UI"
                                                        FontWeight="SemiBold"
                                                        FontSize="22"
-                                                       Foreground="White"
+                                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxWidth="180" />
                                             <TextBlock x:Name="NetworkFlyoutStatus"
@@ -366,7 +366,7 @@
                             <TextBlock Text="{x:Bind ViewModel.NetworkIcon, Mode=OneWay}"
                                        FontFamily="Segoe Fluent Icons"
                                        FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                       Foreground="White"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
@@ -399,7 +399,7 @@
                                     <Style TargetType="FlyoutPresenter">
                                         <Setter Property="Padding" Value="0" />
                                         <Setter Property="MinWidth" Value="240" />
-                                        <Setter Property="CornerRadius" Value="12" />
+                                        <Setter Property="CornerRadius" Value="{ThemeResource OverlayCornerRadius}" />
                                         <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
                                     </Style>
                                 </Flyout.FlyoutPresenterStyle>
@@ -428,7 +428,7 @@
                                                            FontFamily="Segoe UI Variable, Segoe UI"
                                                            FontSize="34"
                                                            FontWeight="SemiBold"
-                                                           Foreground="White" />
+                                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                                 
                                                 <!-- Compact Wattage Flow -->
                                                 <StackPanel Orientation="Horizontal" 
@@ -487,21 +487,21 @@
                                            Text="{x:Bind ViewModel.BatteryIcon, Mode=OneWay}"
                                            FontFamily="Segoe Fluent Icons"
                                            FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                           Foreground="White"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Center" />
                                 <TextBlock x:Name="BatteryOutlineGlyphText"
                                            Text="&#xEBA0;"
                                            FontFamily="Segoe Fluent Icons"
                                            FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                           Foreground="White"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Center" />
                             </Grid>
                             <TextBlock Text="{x:Bind ViewModel.BatteryText, Mode=OneWay}"
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
-                                       Foreground="White"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
@@ -526,7 +526,7 @@
                             <TextBlock Text="{x:Bind ViewModel.ClockText, Mode=OneWay}"
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
-                                       Foreground="White"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                        VerticalAlignment="Center" />
                         </Border>
                     </Grid>
@@ -539,8 +539,8 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Visibility="{x:Bind ViewModel.VirtualDesktopVisibility, Mode=OneWay}"
-                        Background="#1AFFFFFF"
-                        BorderBrush="#40FFFFFF"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="10,3"
@@ -553,7 +553,7 @@
                                FontFamily="Segoe UI Variable, Segoe UI"
                                FontWeight="SemiBold"
                                FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
-                               Foreground="White"
+                               Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                VerticalAlignment="Center" />
                 </Border>
             </Grid>
@@ -569,6 +569,6 @@
                 PointerPressed="ClockEdge_PointerPressed"
                 PointerReleased="ClockEdge_PointerReleased"
                 Tapped="ClockHost_Tapped" />
-        <Border VerticalAlignment="Bottom" Height="1" Background="#18FFFFFF" />
+        <Border VerticalAlignment="Bottom" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
     </Grid>
 </Window>

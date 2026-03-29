@@ -30,27 +30,27 @@ namespace MenuBar
         private string _batteryUsageTimeText;
 
         private readonly SolidColorBrush _mediaPlayingBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F)); // SystemFillColorSuccess
         private readonly SolidColorBrush _mediaPausedBrush =
             new SolidColorBrush(Microsoft.UI.Colors.White);
         private readonly SolidColorBrush _mediaInactiveBrush =
             new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         private readonly SolidColorBrush _hoverBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(38, 255, 255, 255));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255)); // SubtleFillColorSecondary
         private readonly SolidColorBrush _pressedBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(25, 255, 255, 255));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x0A, 255, 255, 255)); // SubtleFillColorTertiary
         private readonly SolidColorBrush _transparentBrush =
             new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         private readonly SolidColorBrush _pillNormalBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x1A, 255, 255, 255));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255)); // SubtleFillColorSecondary
         private readonly SolidColorBrush _batteryDefaultBrush =
             new SolidColorBrush(Microsoft.UI.Colors.White);
         private readonly SolidColorBrush _batteryChargingBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F)); // SystemFillColorSuccess
         private readonly SolidColorBrush _batteryPluggedBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x00, 0xB7, 0xC3));
+            new SolidColorBrush(Microsoft.UI.Colors.White); // plugged-in full: neutral white (no Fluent accent)
         private readonly SolidColorBrush _batterySaverBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0xEA, 0xA3, 0x00));
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0xFC, 0xE1, 0x00)); // SystemFillColorCaution
 
         private static readonly string[] MobileBatteryGlyphs =
         {
@@ -800,7 +800,7 @@ namespace MenuBar
                 FontFamily = new FontFamily("Segoe UI Variable, Segoe UI"),
                 FontSize = fontSize,
                 Foreground = grayed
-                    ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 120, 120, 120))
+                    ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x5D, 255, 255, 255)) // TextFillColorDisabled dark
                     : new SolidColorBrush(Microsoft.UI.Colors.White),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -808,7 +808,7 @@ namespace MenuBar
             var border = new Border
             {
                 Background = _transparentBrush,
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(4), // ControlCornerRadius
                 Padding = new Thickness(8, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Stretch,
                 Tag = tag,
@@ -950,7 +950,7 @@ namespace MenuBar
                 Windows.UI.Color wattageColor;
                 if (isCharging)
                 {
-                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B); // green
+                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F); // SystemFillColorSuccess
                 }
                 else if (watts < 9.0)
                 {
@@ -958,11 +958,11 @@ namespace MenuBar
                 }
                 else if (watts <= 15.0)
                 {
-                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0xEA, 0xA3, 0x00); // amber #EAA300
+                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0xFC, 0xE1, 0x00); // SystemFillColorCaution
                 }
                 else
                 {
-                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0xC4, 0x2B, 0x1C); // red
+                    wattageColor = Microsoft.UI.ColorHelper.FromArgb(255, 0xFF, 0x99, 0xA4); // SystemFillColorCritical dark
                 }
                 ViewModel.BatteryFlyoutWattageBrush = new SolidColorBrush(wattageColor);
                 ViewModel.BatteryFlyoutWattageVisibility = Visibility.Visible;
