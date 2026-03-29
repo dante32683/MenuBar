@@ -46,11 +46,11 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 
 **Hit-test expansion:** Widgets use outer `Grid` (`Margin="0,-3,0,0"`) for hit area + inner `Border` (`Margin="0,3,0,0"`) for visual positioning. Do not use negative right margins on StackPanel items — this collapses the Auto-width column and shifts the layout.
 
-**Fullscreen auto-hide:** `IsWindowFullscreen` compares `GetWindowRect` to `GetMonitorInfo.rcMonitor` (full monitor bounds, not work area — maximized windows do not trigger this) on the same monitor as the bar. `HideBarForFullscreen`: `ABM_REMOVE` + `ShowWindow(SW_HIDE)`. `ShowBarAfterFullscreen`: `ShowWindow(SW_SHOWNA)` + `RegisterOrUpdateAppBar`. State tracked in `_isFullscreenActive`. Triggered from `OnForegroundEvent` (instant) and the 1s clock timer (catches in-place fullscreen like browser video). `TaskbarCreated` in `NewWindowProc` skips re-registration when `_isFullscreenActive` is true.
+**Fullscreen auto-hide:** `IsWindowFullscreen` compares `GetWindowRect` to `GetMonitorInfo.rcMonitor` (full monitor bounds, not work area — maximized windows do not trigger this) on the same monitor as the bar. Shell windows (`Progman`, `WorkerW`, `Shell_TrayWnd`, `Shell_SecondaryTrayWnd`) are excluded — they span the full monitor and would false-trigger on blank virtual desktops. `HideBarForFullscreen`: `ABM_REMOVE` + `ShowWindow(SW_HIDE)`. `ShowBarAfterFullscreen`: `ShowWindow(SW_SHOWNA)` + `RegisterOrUpdateAppBar`. State tracked in `_isFullscreenActive`. Triggered from `OnForegroundEvent` (instant) and the 1s clock timer (catches in-place fullscreen like browser video). `TaskbarCreated` in `NewWindowProc` skips re-registration when `_isFullscreenActive` is true.
 
 **Battery / energy saver:** `EnergySaverOn` = `SystemStatusFlag == 1` OR `PowerGetEffectiveOverlayScheme` returns `961cc777-...` (Power Saver overlay). Do NOT use `Windows.System.Power.PowerManager.EnergySaverStatus` — throws in unpackaged apps. Use `ChargeRateInMilliwatts > 0` for charging detection; do not use `BatteryFlag & 8` alone (Lenovo misreports it).
 
-**Virtual desktop:** `EVENT_SYSTEM_DESKTOPSWITCH` is unreliable from AppBar windows. The registry `CurrentVirtualDesktop` is correct by the time any code runs, so polling every 1s via clock timer is the primary mechanism. No deferred timers needed.
+**Virtual desktop:** `EVENT_SYSTEM_DESKTOPSWITCH` fires before Windows updates `CurrentVirtualDesktop` in the registry. `OnDesktopSwitchEvent` posts a 50ms deferred `UpdateVirtualDesktop()` call (via `DispatcherQueue` + `Task.Delay`) to let the OS finish the switch. The 1s clock timer backs this up. Do not call `UpdateVirtualDesktop()` synchronously in the event — it will read stale data.
 
 **Clock / Notification Center:** `ClockHost_Tapped` sends `Win+N`. Skip if `_lastExternalForegroundHwnd` process is `ShellExperienceHost` (notification center already open). Do not use `FindWindow("Shell_NotificationCenter", ...)`.
 
@@ -69,4 +69,4 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 
 1. **Plan:** Break into explicit phases before writing any code.
 2. **Build after each phase:** `dotnet build MenuBar.csproj`. Fix all errors before proceeding.
-3. **Finalize:** Publish to both `publish/` folders only after all phases pass.
+3. **Finalize:** Always publish to both `publish/` folders after every completed change — use the two `dotnet publish` commands from Build & Run above.

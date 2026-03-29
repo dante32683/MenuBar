@@ -26,6 +26,8 @@ namespace MenuBar
 
         private readonly HardwareService _hwService = new HardwareService();
         private readonly MediaService _mediaService;
+        private readonly BatteryUsageTracker _batteryUsageTracker = new BatteryUsageTracker();
+        private string _batteryUsageTimeText;
 
         private readonly SolidColorBrush _mediaPlayingBrush =
             new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6A, 0xC4, 0x5B));
@@ -292,7 +294,13 @@ namespace MenuBar
             int idObject, int idChild, uint threadId, uint time)
         {
             _appMenuTargetHwnd = IntPtr.Zero; // force menu rebuild on next foreground event
-            UpdateVirtualDesktop();
+            // The registry CurrentVirtualDesktop key is not yet updated when this event fires.
+            // A short delay lets the OS finish the switch before we read the new label.
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                await Task.Delay(50);
+                UpdateVirtualDesktop();
+            });
         }
 
         private void OnTitleChangeEvent(IntPtr hook, uint eventType, IntPtr hwnd,
@@ -304,9 +312,17 @@ namespace MenuBar
             }
         }
 
+        private static bool IsShellWindow(IntPtr hwnd)
+        {
+            var cls = new System.Text.StringBuilder(64);
+            NativeMethods.GetClassName(hwnd, cls, cls.Capacity);
+            return cls.ToString() is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
+        }
+
         private bool IsWindowFullscreen(IntPtr hwnd)
         {
             if (hwnd == IntPtr.Zero || hwnd == _hwnd) return false;
+            if (IsShellWindow(hwnd)) return false;
             if (!NativeMethods.GetWindowRect(hwnd, out NativeMethods.RECT windowRect)) return false;
 
             IntPtr hMonitor = NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MONITOR_DEFAULTTONEAREST);
@@ -597,6 +613,20 @@ namespace MenuBar
         private void UpdateBattery()
         {
             _batteryInfo = _hwService.GetBatteryInfo();
+
+            if (_batteryInfo.HasBattery && !_batteryInfo.IsCalculating
+                && _batteryInfo.RemainingCapacityInMilliwattHours.HasValue
+                && _batteryInfo.FullChargeCapacityInMilliwattHours.HasValue)
+            {
+                bool isFullyCharged = _batteryInfo.Percent >= 99
+                    && _batteryInfo.PluggedIn && !_batteryInfo.Charging;
+                _batteryUsageTimeText = _batteryUsageTracker.Update(
+                    _batteryInfo.RemainingCapacityInMilliwattHours.Value,
+                    _batteryInfo.FullChargeCapacityInMilliwattHours.Value,
+                    _batteryInfo.PluggedIn,
+                    isFullyCharged);
+            }
+
             if (_batteryInfo.HasBattery)
             {
                 if (_batteryInfo.IsCalculating)
@@ -987,6 +1017,17 @@ namespace MenuBar
             else
             {
                 ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
+            }
+
+            // Equivalent usage time since last full charge
+            if (!string.IsNullOrEmpty(_batteryUsageTimeText))
+            {
+                ViewModel.BatteryFlyoutUsageTime = _batteryUsageTimeText;
+                ViewModel.BatteryFlyoutUsageTimeVisibility = Visibility.Visible;
+            }
+            else
+            {
+                ViewModel.BatteryFlyoutUsageTimeVisibility = Visibility.Collapsed;
             }
         }
 
@@ -1469,6 +1510,7 @@ namespace MenuBar
             }
 
             _mediaService?.Dispose();
+            _batteryUsageTracker?.Dispose();
 
             Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged -= OnNetworkStatusChanged;
             _uiSettings.ColorValuesChanged -= OnAccentColorChanged;

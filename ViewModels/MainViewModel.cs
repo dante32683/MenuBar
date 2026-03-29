@@ -355,5 +355,19 @@ namespace MenuBar.ViewModels
             get => _virtualDesktopVisibility;
             set => SetProperty(ref _virtualDesktopVisibility, value);
         }
+
+        private string _batteryFlyoutUsageTime = "";
+        public string BatteryFlyoutUsageTime
+        {
+            get => _batteryFlyoutUsageTime;
+            set => SetProperty(ref _batteryFlyoutUsageTime, value);
+        }
+
+        private Visibility _batteryFlyoutUsageTimeVisibility = Visibility.Collapsed;
+        public Visibility BatteryFlyoutUsageTimeVisibility
+        {
+            get => _batteryFlyoutUsageTimeVisibility;
+            set => SetProperty(ref _batteryFlyoutUsageTimeVisibility, value);
+        }
     }
 }

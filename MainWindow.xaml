@@ -471,6 +471,12 @@
                                                    FontSize="12"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                    Visibility="{x:Bind ViewModel.BatteryFlyoutProjectedVisibility, Mode=OneWay}" />
+
+                                        <TextBlock Text="{x:Bind ViewModel.BatteryFlyoutUsageTime, Mode=OneWay}"
+                                                   FontFamily="Segoe UI Variable, Segoe UI"
+                                                   FontSize="12"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   Visibility="{x:Bind ViewModel.BatteryFlyoutUsageTimeVisibility, Mode=OneWay}" />
                                     </StackPanel>
                                 </Grid>
                             </Flyout>
