@@ -323,6 +323,13 @@ namespace MenuBar
         {
             if (hwnd == IntPtr.Zero || hwnd == _hwnd) return false;
             if (IsShellWindow(hwnd)) return false;
+            if (!NativeMethods.IsWindowVisible(hwnd)) return false;
+            if (NativeMethods.IsIconic(hwnd)) return false; // minimized — GetWindowRect is unreliable
+
+            // Skip cloaked windows (UWP background apps, Start menu, Search overlay, etc.)
+            NativeMethods.DwmGetWindowAttribute(hwnd, NativeMethods.DWMWA_CLOAKED, out int cloaked, sizeof(int));
+            if (cloaked != 0) return false;
+
             if (!NativeMethods.GetWindowRect(hwnd, out NativeMethods.RECT windowRect)) return false;
 
             IntPtr hMonitor = NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MONITOR_DEFAULTTONEAREST);
@@ -341,9 +348,34 @@ namespace MenuBar
                    windowRect.bottom >= monInfo.rcMonitor.bottom;
         }
 
+        // Scans all windows on the bar's monitor for any that are fullscreen.
+        // Used as a fallback when the foreground window itself isn't fullscreen —
+        // e.g. a popup/dialog over a fullscreen game, or focus moved to a different monitor.
+        private bool IsAnyWindowFullscreenOnBarMonitor()
+        {
+            bool found = false;
+            NativeMethods.EnumWindows((hwnd, _) =>
+            {
+                if (IsWindowFullscreen(hwnd))
+                {
+                    found = true;
+                    return false; // stop enumeration
+                }
+                return true;
+            }, IntPtr.Zero);
+            return found;
+        }
+
         private void CheckAndApplyFullscreenState(IntPtr hwnd)
         {
             bool isFullscreen = IsWindowFullscreen(hwnd);
+
+            // Fast path said "not fullscreen" but we were hiding for fullscreen —
+            // verify by scanning the monitor before deciding to restore.
+            // Covers: popups/dialogs over fullscreen apps, focus on a different monitor.
+            if (!isFullscreen && _isFullscreenActive)
+                isFullscreen = IsAnyWindowFullscreenOnBarMonitor();
+
             if (isFullscreen == _isFullscreenActive) return;
 
             _isFullscreenActive = isFullscreen;

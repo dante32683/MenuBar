@@ -2,60 +2,74 @@
 
 A macOS-style menu bar for Windows. Built with WinUI 3.
 
-Sits at the top of your screen and shows the active window title, app menus, media controls, network/battery info, and a clock. Click on most sections to get more details in a dropdown.
+Sits at the top of your screen and shows the active window title, app menus, media controls, network/battery info, and a clock. Click on most sections to get more details in a flyout.
 
 ## What's on the bar
 
-- Active window title & icon
-- App menus (File, Edit, etc. for supported apps)
-- Media controls (play/pause, track info)
-- Network info (SSID, signal, speed)
-- Battery percentage
-- Virtual desktop name
-- Clock (tap it to open Notification Center)
+- **Windows logo** (optional) — tap to open a power menu: Settings, Sleep, Restart, Shut down
+- **Active window title & icon** — shows the foreground app's name and icon
+- **App menus** (optional) — File, Edit, etc. extracted from the active app via UI Automation or Win32
+- **Media controls** — tap to open a flyout with album art, track title/artist/source, progress slider, and shuffle/repeat/prev/play/next buttons
+- **Network** — tap to open a flyout with SSID, connection status, and live speed
+- **Battery** — icon changes color for charging (green), plugged-in full (white), energy saver (yellow), or low (yellow); tap to open a flyout with percentage, wattage, status, and time remaining
+- **Virtual desktop name** (optional) — shows the current desktop as a centered pill
+- **Clock** — tap to open Notification Center; shows time, optional seconds, optional date
 
-## Multi-monitor & Stability
+## Fullscreen Auto-Hide
 
-- **Per-Monitor Docking:** Automatically adjusts when screen resolution or DPI changes using Win32 subclassing.
-- **Explorer Recovery:** If `explorer.exe` crashes or restarts, MenuBar re-registers itself automatically.
-- **High Performance:** UI Automation (app menus) and system COM calls (virtual desktops) run on background threads to ensure the UI never hangs.
-- **Hybrid Desktop Tracking:** Uses both COM and Registry for accurate virtual desktop labels across all Windows 10/11 versions.
+The bar automatically hides when a fullscreen window is detected on the same monitor and reappears when it exits.
 
-## Running it
+## Multi-Monitor & Stability
 
-Just run `MenuBar.exe` from the `publish/win-x64` folder. No installer needed.
+- **Per-monitor DPI docking** — adjusts position and size on resolution or DPI changes via Win32 subclassing
+- **Explorer recovery** — re-registers automatically if `explorer.exe` restarts
+- **Background threads** — UI Automation (app menus) and virtual desktop COM calls run on MTA threads so the UI never hangs
+- **Hybrid desktop tracking** — uses COM + Registry for accurate virtual desktop names across Windows 10 and 11
+
+## Running It
+
+Just run `MenuBar.exe` from the `publish/win-x64` folder. No installer needed. A `settings.json` is created next to the exe on first run.
 
 To build it yourself:
 
 ```powershell
-# Build and publish to a single folder
 dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -o publish/win-x64
+dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-single
 ```
 
-Needs .NET 8 and Windows App SDK 1.5. Windows 10 1809 or newer.
+Requires .NET 8 and Windows App SDK 1.5. Windows 10 1809 or newer.
+
+## Context Menu
+
+Right-click anywhere on the bar to access:
+
+- **Open settings** — opens `settings.json` in your default editor
+- **Reload settings** — applies changes from `settings.json` without restarting
+- **Restart bar** — relaunches the process
+- **Stop bar** — exits
 
 ## Settings
 
-Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** to apply changes.
+Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** to apply changes without restarting.
 
 | Key | Default | What it does |
 |-----|---------|--------------|
 | `bar_height` | `28` | Height in px (28–56) |
-| `show_title` | `true` | Show window title |
-| `show_app_menu` | `false` | Show the app's menus (File, Edit, etc.) |
-| `show_media` | `true` | Show media controls |
-| `show_network` | `true` | Show network info |
-| `show_battery` | `true` | Show battery |
-| `show_projected_runtime` | `true` | Show estimated battery time remaining based on wattage |
-| `show_clock` | `true` | Show clock |
-| `show_virtual_desktop` | `false` | Show the current virtual desktop name |
-| `show_windows_logo` | `false` | Show a Windows logo on the left |
-| `clock_24h` | `false` | Use 24h time |
+| `show_windows_logo` | `false` | Show a Windows logo with power menu on the left |
+| `show_title` | `true` | Show active window title and icon |
+| `show_app_menu` | `false` | Show the active app's menus (File, Edit, etc.) |
+| `show_media` | `true` | Show media widget with flyout controls |
+| `show_network` | `true` | Show network widget with flyout |
+| `show_battery` | `true` | Show battery widget with flyout |
+| `show_virtual_desktop` | `false` | Show current virtual desktop name as a centered pill |
+| `show_clock` | `true` | Show clock; tap to open Notification Center |
+| `show_projected_runtime` | `true` | Show estimated runtime in battery flyout (based on wattage) |
+| `clock_24h` | `false` | Use 24-hour time format |
 | `clock_show_seconds` | `false` | Show seconds in the clock |
-| `clock_show_date` | `true` | Show the date |
-| `clock_date_format` | `"MM/dd/yyyy"` | Format for the date |
-| `use_accent_color` | `true` | Tint bar with your accent color |
-| `title_max_length` | `0` | Max characters for title (0 = no limit) |
-| `media_max_length` | `0` | Max characters for media (0 = no limit) |
-| `font_size_text` | `0` | Manual text size (0 = auto) |
-| `font_size_icon` | `0` | Manual icon size (0 = auto) |
+| `clock_show_date` | `true` | Show the date alongside the time |
+| `clock_date_format` | `"MM/dd/yyyy"` | .NET date format string for the date portion |
+| `use_accent_color` | `true` | Tint the bar background with your Windows accent color |
+| `title_max_length` | `0` | Truncate window title after N characters (0 = no limit) |
+| `media_max_length` | `0` | Truncate media title after N characters (0 = no limit) |
+| `font_size_text` | `0` | Override text size in px (0 = auto-scale with bar height) |
+| `font_size_icon` | `0` | Override icon size in px (0 = auto-scale with bar height) |
