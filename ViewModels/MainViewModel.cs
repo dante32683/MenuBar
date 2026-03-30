@@ -321,6 +321,7 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _batteryFlyoutWattageVisibility, value);
         }
 
+
         private string _batteryFlyoutProjected = "";
         public string BatteryFlyoutProjected
         {

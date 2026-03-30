@@ -1,0 +1,21 @@
+# Build artifacts
+bin/
+obj/
+publish/
+
+# Version Control
+.git/
+
+# IDE/Editor specific
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Claude/Gemini internal state
+.claude/
+.gemini/
+
+# System files
+Thumbs.db
+Desktop.ini

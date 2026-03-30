@@ -59,6 +59,20 @@ namespace MenuBar
             "\uEBAA"
         };
 
+        private static readonly string[] MobBatteryChargingGlyphs =
+        {
+            "\uEBAB", "\uEBAC", "\uEBAD", "\uEBAE", "\uEBAF",
+            "\uEBB0", "\uEBB1", "\uEBB2", "\uEBB3", "\uEBB4",
+            "\uEBB5"
+        };
+
+        private static readonly string[] MobBatterySaverGlyphs =
+        {
+            "\uEBB6", "\uEBB7", "\uEBB8", "\uEBB9", "\uEBBA",
+            "\uEBBB", "\uEBBC", "\uEBBD", "\uEBBE", "\uEBBF",
+            "\uEBC0"
+        };
+
         private IntPtr _hwnd;
         private DispatcherTimer _clockTimer;
         private DispatcherTimer _batteryTimer;
@@ -127,8 +141,15 @@ namespace MenuBar
         {
             if (uMsg == _taskbarCreatedMsg)
             {
-                if (!_isFullscreenActive) // skip re-registration while hidden for fullscreen
-                    RegisterOrUpdateAppBar(registerIfNeeded: true);
+                // Explorer restart wipes the shell's AppBar list — force ABM_NEW regardless of prior state
+                _appBarRegistered = false;
+                if (_isFullscreenActive)
+                {
+                    // Bar was hidden for fullscreen; re-surface it since the shell state was reset
+                    _isFullscreenActive = false;
+                    NativeMethods.ShowWindow(_hwnd, NativeMethods.SW_SHOWNA);
+                }
+                RegisterOrUpdateAppBar(registerIfNeeded: true);
             }
             else if (uMsg == NativeMethods.WM_DPICHANGED)
             {
@@ -309,14 +330,39 @@ namespace MenuBar
             if (hwnd == NativeMethods.GetForegroundWindow())
             {
                 UpdateActiveWindow();
+                // A browser exiting HTML5 fullscreen (e.g. YouTube) keeps the same foreground
+                // window — EVENT_SYSTEM_FOREGROUND never fires. The title change is our signal
+                // that the browser may have resized; re-check fullscreen state immediately.
+                if (_isFullscreenActive)
+                    CheckAndApplyFullscreenState(hwnd);
             }
         }
 
         private static bool IsShellWindow(IntPtr hwnd)
         {
-            var cls = new System.Text.StringBuilder(64);
+            var cls = new System.Text.StringBuilder(256);
             NativeMethods.GetClassName(hwnd, cls, cls.Capacity);
-            return cls.ToString() is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
+            string className = cls.ToString();
+
+            if (className is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd")
+                return true;
+
+            // Ignore Windows 10/11 shell overlays that might span the whole screen
+            if (className is "XamlExplorerHostIslandWindow" or "MultitaskingViewFrame" or "TaskSwitchWnd")
+                return true;
+
+            if (className == "Windows.UI.Core.CoreWindow")
+            {
+                var title = new System.Text.StringBuilder(256);
+                NativeMethods.GetWindowText(hwnd, title, title.Capacity);
+                string windowTitle = title.ToString();
+
+                // Common shell CoreWindows that shouldn't hide the menu bar
+                if (windowTitle is "Task View" or "Search" or "Action center" or "Start" or "Quick settings" or "Notification Center")
+                    return true;
+            }
+
+            return false;
         }
 
         private bool IsWindowFullscreen(IntPtr hwnd)
@@ -325,6 +371,15 @@ namespace MenuBar
             if (IsShellWindow(hwnd)) return false;
             if (!NativeMethods.IsWindowVisible(hwnd)) return false;
             if (NativeMethods.IsIconic(hwnd)) return false; // minimized — GetWindowRect is unreliable
+            // Maximized windows (IsZoomed=true) are in Windows managed-maximize state and will
+            // shrink back when the AppBar is restored. They are never truly fullscreen; if the bar
+            // is hidden, the expanded work area can push them to monitor-size, causing a deadlock
+            // where IsAnyWindowFullscreenOnBarMonitor keeps seeing them as fullscreen.
+            if (NativeMethods.IsZoomed(hwnd)) return false;
+
+            // Skip tool windows (third-party overlays, custom drop-downs, etc.)
+            int exStyle = NativeMethods.GetWindowLong(hwnd, NativeMethods.GWL_EXSTYLE);
+            if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0) return false;
 
             // Skip cloaked windows (UWP background apps, Start menu, Search overlay, etc.)
             NativeMethods.DwmGetWindowAttribute(hwnd, NativeMethods.DWMWA_CLOAKED, out int cloaked, sizeof(int));
@@ -672,17 +727,24 @@ namespace MenuBar
                 else
                 {
                     ViewModel.BatteryText = $"{_batteryInfo.Percent}%";
-                    ViewModel.BatteryIcon = GetBatteryFillGlyph(_batteryInfo.Percent);
+                    bool lowBattery = !_batteryInfo.PluggedIn && !_batteryInfo.Charging
+                        && (_batteryInfo.EnergySaverOn || _batteryInfo.Percent <= 20);
+                    ViewModel.BatteryIcon = GetBatteryFillGlyph(_batteryInfo.Percent, _batteryInfo.Charging, lowBattery);
                     var brush = GetBatteryFillBrush(_batteryInfo.Percent, _batteryInfo.Charging, _batteryInfo.PluggedIn, _batteryInfo.EnergySaverOn);
                     BatteryFillGlyphText.Foreground = brush;
 
+                    BatteryOutlineGlyphText.Text = _batteryInfo.Charging
+                        ? "\uEBAB"
+                        : (lowBattery ? "\uEBB6" : "\uEBA0");
                     BatteryOutlineGlyphText.Visibility = (brush == _batteryDefaultBrush)
                         ? Visibility.Collapsed
                         : Visibility.Visible;
 
                     string status = _batteryInfo.Charging
                         ? "Charging"
-                        : (_batteryInfo.PluggedIn ? "Plugged in, fully charged" : "On battery");
+                        : (_batteryInfo.PluggedIn
+                            ? (_batteryInfo.Percent >= 99 ? "Plugged in, fully charged" : "Smart charging")
+                            : "On battery");
                     ViewModel.BatteryTooltip = $"Battery: {_batteryInfo.Percent}%\n{status}";
                 }
             }
@@ -1418,15 +1480,18 @@ namespace MenuBar
             return $"{Math.Max(1, span.Minutes)}m remaining";
         }
 
-        private static string GetBatteryFillGlyph(int percent)
+        private static string GetBatteryFillGlyph(int percent, bool charging, bool lowBattery)
         {
             int bucket = Math.Clamp((int)Math.Round(percent / 10.0), 0, 10);
+            if (charging) return MobBatteryChargingGlyphs[bucket];
+            if (lowBattery) return MobBatterySaverGlyphs[bucket];
             return MobileBatteryGlyphs[bucket];
         }
 
         private SolidColorBrush GetBatteryFillBrush(int percent, bool charging, bool pluggedIn, bool energySaverOn)
         {
             if (charging) return _batteryChargingBrush;
+            if (pluggedIn && percent < 99) return _batteryChargingBrush; // smart charging = green
             if (pluggedIn) return _batteryPluggedBrush;
             if (energySaverOn) return _batterySaverBrush;
             return percent <= 20 ? _batterySaverBrush : _batteryDefaultBrush;

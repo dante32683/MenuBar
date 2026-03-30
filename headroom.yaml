@@ -1,0 +1,24 @@
+# headroom.yaml for WinUI 3 Development
+project: "Menu-Bar-Windows"
+optimization:
+  # 'SmartCrush' uses Tree-sitter to keep method signatures but strip logic
+  level: "SmartCrush" 
+  
+  targets:
+    - "**/*.cs"    # C# Logic files
+    - "**/*.xaml"  # UI Layout files
+    
+  exclude:
+    - "bin/**"     # Compiled binaries
+    - "obj/**"     # Intermediate build files
+    - "**/*.g.cs"  # EXTREMELY IMPORTANT: Ignore auto-generated C# files
+    - "**/*.i.g.cs"
+    - "Properties/**"
+    - ".vs/**"
+    
+  # Retain important WinUI metadata
+  preserve:
+    - "namespace"
+    - "class"
+    - "public"
+    - "internal"

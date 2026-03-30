@@ -352,6 +352,10 @@ namespace MenuBar.Services
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool IsIconic(IntPtr hWnd);
 
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool IsZoomed(IntPtr hWnd);
+
         // Window enumeration
         public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 
