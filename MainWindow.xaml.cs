@@ -1014,6 +1014,7 @@ namespace MenuBar
             }
 
             ViewModel.BatteryFlyoutPercent = $"{_batteryInfo.Percent}%";
+            ViewModel.BatteryFlyoutProgress = _batteryInfo.Percent;
             ViewModel.BatteryFlyoutStatus = _batteryInfo.Charging
                 ? "Charging"
                 : (_batteryInfo.PluggedIn

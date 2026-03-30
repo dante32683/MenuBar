@@ -21,4 +21,6 @@ ARM64/
 .claude/
 GEMINI.md
 
+.claudeignore
+headroom.yaml
 .env

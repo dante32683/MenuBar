@@ -314,6 +314,13 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _batteryFlyoutWattageBrush, value);
         }
 
+        private double _batteryFlyoutProgress;
+        public double BatteryFlyoutProgress
+        {
+            get => _batteryFlyoutProgress;
+            set => SetProperty(ref _batteryFlyoutProgress, value);
+        }
+
         private Visibility _batteryFlyoutWattageVisibility = Visibility.Collapsed;
         public Visibility BatteryFlyoutWattageVisibility
         {

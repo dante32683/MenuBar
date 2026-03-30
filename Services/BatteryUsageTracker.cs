@@ -102,6 +102,12 @@ namespace MenuBar.Services
                     {
                         _dischargeStartMWh = remainingMWh;
                         _dischargeStartTime = DateTime.UtcNow;
+                        // Bootstrap anchor if no full-charge event has ever been seen
+                        if (_state.AnchorMWh <= 0 && fullMWh > 0)
+                        {
+                            _state.AnchorMWh = fullMWh;
+                            Save();
+                        }
                     }
                 }
 
@@ -132,7 +138,7 @@ namespace MenuBar.Services
             int h = (int)(minutes / 60);
             int m = (int)(minutes % 60);
             if (h == 0 && m == 0) return null;
-            return h > 0 ? $"{h}h {m}m equivalent use" : $"{m}m equivalent use";
+            return h > 0 ? $"{h}h {m}m since full" : $"{m}m since full";
         }
 
         private void FinalizeDischarge(int currentMWh)
