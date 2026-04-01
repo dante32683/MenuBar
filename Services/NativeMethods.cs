@@ -24,7 +24,9 @@ namespace MenuBar.Services
         public const int SWP_NOOWNERZORDER = 0x0200;
 
         // Window styles
+        public const int GWL_STYLE = -16;
         public const int GWL_EXSTYLE = -20;
+        public const int WS_CAPTION = 0x00C00000;
         public const int WS_EX_TOOLWINDOW = 0x00000080;
         public const int WS_EX_APPWINDOW = 0x00040000;
 
@@ -39,6 +41,9 @@ namespace MenuBar.Services
         public const int KEYEVENTF_KEYUP = 0x0002;
         public const byte VK_LWIN = 0x5B;
         public const byte VK_N = 0x4E;
+        public const byte VK_VOLUME_MUTE = 0xAD;
+        public const byte VK_VOLUME_DOWN = 0xAE;
+        public const byte VK_VOLUME_UP = 0xAF;
 
         // Screen metrics
         public const int SM_XVIRTUALSCREEN = 76;

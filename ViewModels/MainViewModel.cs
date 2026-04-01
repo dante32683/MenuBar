@@ -1,3 +1,4 @@
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 
@@ -240,15 +241,36 @@ namespace MenuBar.ViewModels
         public double IconFontSize
         {
             get => _iconFontSize;
-            set => SetProperty(ref _iconFontSize, value);
+            set
+            {
+                if (SetProperty(ref _iconFontSize, value))
+                {
+                    OnPropertyChanged(nameof(FlyoutIconFontSize));
+                }
+            }
         }
 
         private double _textFontSize = 11;
         public double TextFontSize
         {
             get => _textFontSize;
-            set => SetProperty(ref _textFontSize, value);
+            set
+            {
+                if (SetProperty(ref _textFontSize, value))
+                {
+                    OnPropertyChanged(nameof(FlyoutTitleFontSize));
+                    OnPropertyChanged(nameof(FlyoutBodyFontSize));
+                    OnPropertyChanged(nameof(FlyoutCaptionFontSize));
+                }
+            }
         }
+
+        // Responsive Flyout Font Sizes
+        // Derived from TextFontSize (base 11px -> 14px body, 20px title, 12px caption)
+        public double FlyoutTitleFontSize => Math.Round(TextFontSize * 1.82);   // 11 * 1.82 ≈ 20
+        public double FlyoutBodyFontSize => Math.Round(TextFontSize * 1.27);    // 11 * 1.27 ≈ 14
+        public double FlyoutCaptionFontSize => Math.Round(TextFontSize * 1.09); // 11 * 1.09 ≈ 12
+        public double FlyoutIconFontSize => Math.Round(IconFontSize * 1.71);    // 14 * 1.71 ≈ 24
 
         private CornerRadius _hostCornerRadius = new CornerRadius(6);
         public CornerRadius HostCornerRadius
@@ -319,6 +341,13 @@ namespace MenuBar.ViewModels
         {
             get => _batteryFlyoutProgress;
             set => SetProperty(ref _batteryFlyoutProgress, value);
+        }
+
+        private Visibility _batteryFlyoutProgressVisibility = Visibility.Visible;
+        public Visibility BatteryFlyoutProgressVisibility
+        {
+            get => _batteryFlyoutProgressVisibility;
+            set => SetProperty(ref _batteryFlyoutProgressVisibility, value);
         }
 
         private Visibility _batteryFlyoutWattageVisibility = Visibility.Collapsed;

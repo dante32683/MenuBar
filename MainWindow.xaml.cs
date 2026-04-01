@@ -375,7 +375,13 @@ namespace MenuBar
             // shrink back when the AppBar is restored. They are never truly fullscreen; if the bar
             // is hidden, the expanded work area can push them to monitor-size, causing a deadlock
             // where IsAnyWindowFullscreenOnBarMonitor keeps seeing them as fullscreen.
-            if (NativeMethods.IsZoomed(hwnd)) return false;
+            // HOWEVER, browsers in fullscreen (F11/YouTube) often keep IsZoomed=true but remove WS_CAPTION.
+            if (NativeMethods.IsZoomed(hwnd))
+            {
+                int style = NativeMethods.GetWindowLong(hwnd, NativeMethods.GWL_STYLE);
+                if ((style & NativeMethods.WS_CAPTION) == NativeMethods.WS_CAPTION)
+                    return false;
+            }
 
             // Skip tool windows (third-party overlays, custom drop-downs, etc.)
             int exStyle = NativeMethods.GetWindowLong(hwnd, NativeMethods.GWL_EXSTYLE);
@@ -1015,6 +1021,7 @@ namespace MenuBar
 
             ViewModel.BatteryFlyoutPercent = $"{_batteryInfo.Percent}%";
             ViewModel.BatteryFlyoutProgress = _batteryInfo.Percent;
+            ViewModel.BatteryFlyoutProgressVisibility = ToVisibility(_settings.BatteryShowProgressBar);
             ViewModel.BatteryFlyoutStatus = _batteryInfo.Charging
                 ? "Charging"
                 : (_batteryInfo.PluggedIn
@@ -1115,7 +1122,7 @@ namespace MenuBar
             }
 
             // Equivalent usage time since last full charge
-            if (!string.IsNullOrEmpty(_batteryUsageTimeText))
+            if (_settings.BatteryShowUsageTime && !string.IsNullOrEmpty(_batteryUsageTimeText))
             {
                 ViewModel.BatteryFlyoutUsageTime = _batteryUsageTimeText;
                 ViewModel.BatteryFlyoutUsageTimeVisibility = Visibility.Visible;
@@ -1173,6 +1180,40 @@ namespace MenuBar
         #endregion
 
         #region Event Handlers
+
+        private int _volumeScrollDeltaAccumulator;
+
+        private void RootGrid_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_settings.EnableVolumeScroll) return;
+
+            var pointerPoint = e.GetCurrentPoint(RootGrid);
+            int delta = pointerPoint.Properties.MouseWheelDelta;
+            _volumeScrollDeltaAccumulator += delta;
+
+            int threshold = _settings.VolumeScrollThreshold;
+            while (Math.Abs(_volumeScrollDeltaAccumulator) >= threshold)
+            {
+                if (_volumeScrollDeltaAccumulator > 0)
+                {
+                    SendKey(NativeMethods.VK_VOLUME_UP);
+                    _volumeScrollDeltaAccumulator -= threshold;
+                }
+                else
+                {
+                    SendKey(NativeMethods.VK_VOLUME_DOWN);
+                    _volumeScrollDeltaAccumulator += threshold;
+                }
+            }
+
+            e.Handled = true;
+        }
+
+        private static void SendKey(byte key)
+        {
+            NativeMethods.keybd_event(key, 0, 0, 0);
+            NativeMethods.keybd_event(key, 0, NativeMethods.KEYEVENTF_KEYUP, 0);
+        }
 
         private void LogoHost_Tapped(object sender, TappedRoutedEventArgs e)
         {

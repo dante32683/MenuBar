@@ -64,6 +64,18 @@ namespace MenuBar.Services
         [JsonPropertyName("show_virtual_desktop")]
         public bool ShowVirtualDesktop { get; set; } = false;
 
+        [JsonPropertyName("enable_volume_scroll")]
+        public bool EnableVolumeScroll { get; set; } = true;
+
+        [JsonPropertyName("volume_scroll_threshold")]
+        public int VolumeScrollThreshold { get; set; } = 120;
+
+        [JsonPropertyName("battery_show_progress_bar")]
+        public bool BatteryShowProgressBar { get; set; } = true;
+
+        [JsonPropertyName("battery_show_usage_time")]
+        public bool BatteryShowUsageTime { get; set; } = true;
+
         public static MenuBarSettings CreateDefault()
         {
             return new MenuBarSettings();
@@ -79,6 +91,8 @@ namespace MenuBar.Services
             BarHeight = GetEffectiveBarHeight();
             if (string.IsNullOrWhiteSpace(ClockDateFormat))
                 ClockDateFormat = "MM/dd/yyyy";
+            if (VolumeScrollThreshold <= 0)
+                VolumeScrollThreshold = 120;
         }
     }
 

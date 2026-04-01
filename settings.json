@@ -17,7 +17,11 @@
     "font_size_text":     "Override text font size in pixels (battery %, time, title). 0 = auto-scale from bar_height.",
     "font_size_icon":     "Override icon font size in pixels (battery, network glyphs). 0 = auto-scale from bar_height.",
     "show_app_menu":      "Show the active window's application menu (File, Edit, …) as buttons on the left side. Requires the foreground app to have a Win32 menu.",
-    "show_virtual_desktop": "Show the current virtual desktop label (Desktop 1, Desktop 2, …) on the left side."
+    "show_virtual_desktop": "Show the current virtual desktop label (Desktop 1, Desktop 2, …) on the left side.",
+    "enable_volume_scroll": "Enable system volume control by scrolling anywhere on the bar.",
+    "volume_scroll_threshold": "Cumulative scroll delta required to change volume (120 = one standard mouse wheel click).",
+    "battery_show_progress_bar": "Show a charge level progress bar in the battery flyout.",
+    "battery_show_usage_time": "Show 'usage since full charge' time in the battery flyout (requires discharge history to build up)."
   },
 
   "bar_height": 28,
@@ -37,5 +41,9 @@
   "font_size_text": 0,
   "font_size_icon": 0,
   "show_app_menu": false,
-  "show_virtual_desktop": false
+  "show_virtual_desktop": false,
+  "enable_volume_scroll": true,
+  "volume_scroll_threshold": 120,
+  "battery_show_progress_bar": true,
+  "battery_show_usage_time": true
 }

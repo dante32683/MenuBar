@@ -12,6 +12,7 @@ Sits at the top of your screen and shows the active window title, app menus, med
 - **Media controls** — tap to open a flyout with album art, track title/artist/source, progress slider, and shuffle/repeat/prev/play/next buttons
 - **Network** — tap to open a flyout with SSID, connection status, and live speed
 - **Battery** — icon changes color for charging (green), plugged-in full (white), energy saver (yellow), or low (yellow); tap to open a flyout with percentage, wattage, status, and time remaining
+- **Volume Control** — scroll up or down anywhere on the bar to change the system volume; triggers the native Windows OSD
 - **Virtual desktop name** (optional) — shows the current desktop as a centered pill
 - **Clock** — tap to open Notification Center; shows time, optional seconds, optional date
 
@@ -62,8 +63,12 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 | `show_network` | `true` | Show network widget with flyout |
 | `show_battery` | `true` | Show battery widget with flyout |
 | `show_virtual_desktop` | `false` | Show current virtual desktop name as a centered pill |
+| `enable_volume_scroll` | `true` | Enable system volume control by scrolling on the bar |
+| `volume_scroll_threshold` | `120` | Amount of scroll required per volume click (120 = one standard mouse wheel click) |
 | `show_clock` | `true` | Show clock; tap to open Notification Center |
 | `show_projected_runtime` | `true` | Show estimated runtime in battery flyout (based on wattage) |
+| `battery_show_progress_bar` | `true` | Show charge level progress bar in the battery flyout |
+| `battery_show_usage_time` | `true` | Show "usage since full charge" time in the battery flyout |
 | `clock_24h` | `false` | Use 24-hour time format |
 | `clock_show_seconds` | `false` | Show seconds in the clock |
 | `clock_show_date` | `true` | Show the date alongside the time |
