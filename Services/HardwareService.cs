@@ -133,11 +133,17 @@ namespace MenuBar.Services
                 }
 
                 var adapter = profile.NetworkAdapter;
-                if (adapter != null && adapter.OutboundMaxBitsPerSecond > 0)
+                if (adapter != null)
                 {
-                    int speedMbps = (int)(adapter.OutboundMaxBitsPerSecond / 1_000_000);
-                    info.ReceiveRateMbps = speedMbps;
-                    info.TransmitRateMbps = speedMbps;
+                    if (adapter.InboundMaxBitsPerSecond > 0)
+                    {
+                        info.ReceiveRateMbps = (int)(adapter.InboundMaxBitsPerSecond / 1_000_000);
+                    }
+
+                    if (adapter.OutboundMaxBitsPerSecond > 0)
+                    {
+                        info.TransmitRateMbps = (int)(adapter.OutboundMaxBitsPerSecond / 1_000_000);
+                    }
                 }
             }
             catch

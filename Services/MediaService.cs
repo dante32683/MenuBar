@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Media.Control;
 
 namespace MenuBar.Services
@@ -17,6 +21,7 @@ namespace MenuBar.Services
             public string Title { get; set; } = string.Empty;
             public string Artist { get; set; } = string.Empty;
             public string SourceApp { get; set; } = string.Empty;
+            public ImageSource SourceAppIcon { get; set; }
             public bool Playing { get; set; }
             public ImageSource AlbumCover { get; set; }
             public bool? IsShuffleActive { get; set; }
@@ -38,7 +43,9 @@ namespace MenuBar.Services
 
         private string _lastTrackId = string.Empty;
         private string _lastPlayingAppId = string.Empty;
+        private string _lastSourceAppId = string.Empty;
         private ImageSource _cachedAlbumCover;
+        private ImageSource _cachedSourceAppIcon;
 
         public event Action<MediaState> StateChanged;
         public MediaState CurrentState { get; private set; } = MediaState.Empty;
@@ -153,6 +160,8 @@ namespace MenuBar.Services
             _currentSession = session;
             _lastTrackId = string.Empty;
             _cachedAlbumCover = null;
+            _lastSourceAppId = string.Empty;
+            _cachedSourceAppIcon = null;
 
             if (_currentSession != null)
             {
@@ -213,6 +222,7 @@ namespace MenuBar.Services
                 var state = new MediaState
                 {
                     SourceApp = FormatSourceApp(_currentSession.SourceAppUserModelId),
+                    SourceAppIcon = CurrentState.SourceAppIcon,
                     Playing = isPlaying,
                     IsShuffleActive = playback?.IsShuffleActive,
                     RepeatMode = playback?.AutoRepeatMode,
@@ -226,6 +236,7 @@ namespace MenuBar.Services
                     var props = await _currentSession.TryGetMediaPropertiesAsync();
                     state.Title = props?.Title ?? string.Empty;
                     state.Artist = props?.Artist ?? string.Empty;
+                    state.SourceAppIcon = ResolveSourceAppIcon(_currentSession.SourceAppUserModelId);
 
                     string trackId = $"{state.SourceApp}:{state.Title}:{state.Artist}";
                     if (trackId != _lastTrackId)
@@ -255,6 +266,7 @@ namespace MenuBar.Services
                     state.Title = CurrentState.Title;
                     state.Artist = CurrentState.Artist;
                     state.AlbumCover = _cachedAlbumCover;
+                    state.SourceAppIcon = CurrentState.SourceAppIcon;
                 }
 
                 CurrentState = state;
@@ -284,6 +296,175 @@ namespace MenuBar.Services
                 "Music.UI" => "Media Player",
                 _ => name
             };
+        }
+
+        private ImageSource ResolveSourceAppIcon(string aumid)
+        {
+            if (string.IsNullOrWhiteSpace(aumid))
+            {
+                _lastSourceAppId = string.Empty;
+                _cachedSourceAppIcon = null;
+                return null;
+            }
+
+            if (string.Equals(_lastSourceAppId, aumid, StringComparison.OrdinalIgnoreCase))
+            {
+                return _cachedSourceAppIcon;
+            }
+
+            _lastSourceAppId = aumid;
+            _cachedSourceAppIcon = TryGetSourceAppIcon(aumid);
+            return _cachedSourceAppIcon;
+        }
+
+        private static ImageSource TryGetSourceAppIcon(string aumid)
+        {
+            string processName = GetProcessNameFromAumid(aumid);
+            if (string.IsNullOrWhiteSpace(processName))
+            {
+                return null;
+            }
+
+            try
+            {
+                foreach (var process in Process.GetProcessesByName(processName))
+                {
+                    try
+                    {
+                        IntPtr hwnd = process.MainWindowHandle;
+                        if (hwnd == IntPtr.Zero)
+                        {
+                            continue;
+                        }
+
+                        ImageSource icon = GetWindowIconBitmap(hwnd);
+                        if (icon != null)
+                        {
+                            return icon;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private static string GetProcessNameFromAumid(string aumid)
+        {
+            if (string.IsNullOrWhiteSpace(aumid))
+            {
+                return string.Empty;
+            }
+
+            string token = aumid;
+            if (token.Contains('!'))
+            {
+                token = token.Split('!')[0];
+            }
+
+            int exeIndex = token.LastIndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+            if (exeIndex >= 0)
+            {
+                token = token[..(exeIndex + 4)];
+            }
+
+            string fileName = Path.GetFileNameWithoutExtension(token);
+            return fileName;
+        }
+
+        private static ImageSource GetWindowIconBitmap(IntPtr hwnd)
+        {
+            IntPtr hIcon = NativeMethods.SendMessage(hwnd, NativeMethods.WM_GETICON, NativeMethods.ICON_SMALL2, 0);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.SendMessage(hwnd, NativeMethods.WM_GETICON, NativeMethods.ICON_SMALL, 0);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.SendMessage(hwnd, NativeMethods.WM_GETICON, NativeMethods.ICON_BIG, 0);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.GetClassLongPtr(hwnd, NativeMethods.GCLP_HICONSM);
+            if (hIcon == IntPtr.Zero)
+                hIcon = NativeMethods.GetClassLongPtr(hwnd, NativeMethods.GCLP_HICON);
+            if (hIcon == IntPtr.Zero)
+                return null;
+
+            return HIconToWriteableBitmap(hIcon);
+        }
+
+        private static WriteableBitmap HIconToWriteableBitmap(IntPtr hIcon)
+        {
+            int size = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXSMICON);
+            if (size <= 0) size = 16;
+
+            var bmi = new NativeMethods.BITMAPINFOHEADER
+            {
+                biSize = Marshal.SizeOf<NativeMethods.BITMAPINFOHEADER>(),
+                biWidth = size,
+                biHeight = -size,
+                biPlanes = 1,
+                biBitCount = 32,
+                biCompression = 0
+            };
+
+            IntPtr hdc = NativeMethods.CreateCompatibleDC(IntPtr.Zero);
+            if (hdc == IntPtr.Zero) return null;
+
+            IntPtr hBitmap = NativeMethods.CreateDIBSection(
+                hdc, ref bmi, NativeMethods.DIB_RGB_COLORS,
+                out IntPtr ppvBits, IntPtr.Zero, 0);
+            if (hBitmap == IntPtr.Zero)
+            {
+                NativeMethods.DeleteDC(hdc);
+                return null;
+            }
+
+            IntPtr oldBitmap = NativeMethods.SelectObject(hdc, hBitmap);
+            NativeMethods.DrawIconEx(hdc, 0, 0, hIcon, size, size, 0, IntPtr.Zero, NativeMethods.DI_NORMAL);
+            NativeMethods.SelectObject(hdc, oldBitmap);
+
+            byte[] pixels = new byte[size * size * 4];
+            Marshal.Copy(ppvBits, pixels, 0, pixels.Length);
+
+            NativeMethods.DeleteObject(hBitmap);
+            NativeMethods.DeleteDC(hdc);
+
+            bool hasAlpha = false;
+            for (int i = 3; i < pixels.Length; i += 4)
+            {
+                if (pixels[i] != 0) { hasAlpha = true; break; }
+            }
+
+            if (!hasAlpha)
+            {
+                for (int i = 0; i < pixels.Length; i += 4)
+                {
+                    if (pixels[i] != 0 || pixels[i + 1] != 0 || pixels[i + 2] != 0)
+                        pixels[i + 3] = 255;
+                }
+            }
+
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                byte a = pixels[i + 3];
+                if (a == 0 || a == 255) continue;
+                pixels[i] = (byte)(pixels[i] * a / 255);
+                pixels[i + 1] = (byte)(pixels[i + 1] * a / 255);
+                pixels[i + 2] = (byte)(pixels[i + 2] * a / 255);
+            }
+
+            var wb = new WriteableBitmap(size, size);
+            using (var stream = wb.PixelBuffer.AsStream())
+                stream.Write(pixels, 0, pixels.Length);
+            wb.Invalidate();
+            return wb;
         }
 
         public async Task SendPlayPauseAsync()

@@ -10,7 +10,7 @@ Sits at the top of your screen and shows the active window title, app menus, med
 - **Active window title & icon** — shows the foreground app's name and icon
 - **App menus** (optional) — File, Edit, etc. extracted from the active app via UI Automation or Win32
 - **Media controls** — tap to open a flyout with album art, track title/artist/source, progress slider, and shuffle/repeat/prev/play/next buttons
-- **Network** — tap to open a flyout with SSID, connection status, and live speed
+- **Network** — tap to open a flyout with SSID, connection status, and link speed
 - **Battery** — icon changes color for charging (green), plugged-in full (white), energy saver (yellow), or low (yellow); tap to open a flyout with percentage, wattage, status, and time remaining
 - **Volume Control** — scroll up or down anywhere on the bar to change the system volume; triggers the native Windows OSD
 - **Virtual desktop name** (optional) — shows the current desktop as a centered pill
@@ -29,13 +29,12 @@ The bar automatically hides when a fullscreen window is detected on the same mon
 
 ## Running It
 
-Just run `MenuBar.exe` from the `publish/win-x64` folder. No installer needed. A `settings.json` is created next to the exe on first run.
+Just run `MenuBar.exe` from the `publish` folder. No installer needed. A `settings.json` is created next to the exe on first run.
 
 To build it yourself:
 
 ```powershell
-dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -o publish/win-x64
-dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64-single
+dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -o publish --no-self-contained
 ```
 
 Requires .NET 8 and Windows App SDK 1.5. Windows 10 1809 or newer.
@@ -55,7 +54,7 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 
 | Key | Default | What it does |
 |-----|---------|--------------|
-| `bar_height` | `28` | Height in px (28–56) |
+| `bar_height` | `28` | Height in px (26–56) |
 | `show_windows_logo` | `false` | Show a Windows logo with power menu on the left |
 | `show_title` | `true` | Show active window title and icon |
 | `show_app_menu` | `false` | Show the active app's menus (File, Edit, etc.) |
@@ -66,9 +65,12 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 | `enable_volume_scroll` | `true` | Enable system volume control by scrolling on the bar |
 | `volume_scroll_threshold` | `120` | Amount of scroll required per volume click (120 = one standard mouse wheel click) |
 | `show_clock` | `true` | Show clock; tap to open Notification Center |
-| `show_projected_runtime` | `true` | Show estimated runtime in battery flyout (based on wattage) |
+| `show_projected_runtime` | `true` | Show battery runtime prediction in the battery flyout when enough charge-rate data is available |
 | `battery_show_progress_bar` | `true` | Show charge level progress bar in the battery flyout |
 | `battery_show_usage_time` | `true` | Show "usage since full charge" time in the battery flyout |
+| `media_show_progress_bar` | `true` | Show the seek/progress bar in the media flyout |
+| `media_show_shuffle_button` | `true` | Show the shuffle button in the media flyout |
+| `media_show_loop_button` | `true` | Show the loop/repeat button in the media flyout |
 | `clock_24h` | `false` | Use 24-hour time format |
 | `clock_show_seconds` | `false` | Show seconds in the clock |
 | `clock_show_date` | `true` | Show the date alongside the time |

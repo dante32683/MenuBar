@@ -29,28 +29,19 @@ namespace MenuBar
         private readonly BatteryUsageTracker _batteryUsageTracker = new BatteryUsageTracker();
         private string _batteryUsageTimeText;
 
-        private readonly SolidColorBrush _mediaPlayingBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F)); // SystemFillColorSuccess
-        private readonly SolidColorBrush _mediaPausedBrush =
-            new SolidColorBrush(Microsoft.UI.Colors.White);
+        private readonly Brush _mediaPlayingBrush;
+        private readonly Brush _mediaPausedBrush;
         private readonly SolidColorBrush _mediaInactiveBrush =
             new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-        private readonly SolidColorBrush _hoverBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255)); // SubtleFillColorSecondary
-        private readonly SolidColorBrush _pressedBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x0A, 255, 255, 255)); // SubtleFillColorTertiary
+        private readonly Brush _hoverBrush;
+        private readonly Brush _pressedBrush;
         private readonly SolidColorBrush _transparentBrush =
             new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-        private readonly SolidColorBrush _pillNormalBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255)); // SubtleFillColorSecondary
-        private readonly SolidColorBrush _batteryDefaultBrush =
-            new SolidColorBrush(Microsoft.UI.Colors.White);
-        private readonly SolidColorBrush _batteryChargingBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F)); // SystemFillColorSuccess
-        private readonly SolidColorBrush _batteryPluggedBrush =
-            new SolidColorBrush(Microsoft.UI.Colors.White); // plugged-in full: neutral white (no Fluent accent)
-        private readonly SolidColorBrush _batterySaverBrush =
-            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0xFC, 0xE1, 0x00)); // SystemFillColorCaution
+        private readonly Brush _pillNormalBrush;
+        private readonly Brush _batteryDefaultBrush;
+        private readonly Brush _batteryChargingBrush;
+        private readonly Brush _batteryPluggedBrush;
+        private readonly Brush _batterySaverBrush;
 
         private static readonly string[] MobileBatteryGlyphs =
         {
@@ -107,6 +98,15 @@ namespace MenuBar
         public MainWindow()
         {
             InitializeComponent();
+            _mediaPlayingBrush = GetThemeBrush("SystemFillColorSuccessBrush", Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F));
+            _mediaPausedBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
+            _hoverBrush = GetThemeBrush("SubtleFillColorSecondaryBrush", Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255));
+            _pressedBrush = GetThemeBrush("SubtleFillColorTertiaryBrush", Microsoft.UI.ColorHelper.FromArgb(0x0A, 255, 255, 255));
+            _pillNormalBrush = GetThemeBrush("SubtleFillColorSecondaryBrush", Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255));
+            _batteryDefaultBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
+            _batteryChargingBrush = GetThemeBrush("SystemFillColorSuccessBrush", Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F));
+            _batteryPluggedBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
+            _batterySaverBrush = GetThemeBrush("SystemFillColorCautionBrush", Microsoft.UI.ColorHelper.FromArgb(255, 0xFC, 0xE1, 0x00));
             _hwnd = WindowNative.GetWindowHandle(this);
             _mediaService = new MediaService(DispatcherQueue);
             Closed += Window_Closed;
@@ -517,6 +517,17 @@ namespace MenuBar
             BackgroundBorder.Background = new SolidColorBrush(c);
         }
 
+        private SolidColorBrush GetThemeBrush(string key, Windows.UI.Color fallbackColor)
+        {
+            if (Application.Current?.Resources.TryGetValue(key, out object resource) == true
+                && resource is SolidColorBrush brush)
+            {
+                return brush;
+            }
+
+            return new SolidColorBrush(fallbackColor);
+        }
+
         private void ApplySettings()
         {
             ViewModel.LogoVisibility = ToVisibility(_settings.ShowWindowsLogo);
@@ -525,6 +536,15 @@ namespace MenuBar
             ViewModel.BatteryVisibility = ToVisibility(_settings.ShowBattery);
             ViewModel.ClockVisibility = ToVisibility(_settings.ShowClock);
             ViewModel.VirtualDesktopVisibility = ToVisibility(_settings.ShowVirtualDesktop);
+            ViewModel.MediaFlyoutProgressVisibility = ToVisibility(_settings.MediaShowProgressBar);
+            ViewModel.MediaShuffleVisibility = ToVisibility(_settings.MediaShowShuffleButton);
+            ViewModel.MediaRepeatVisibility = ToVisibility(_settings.MediaShowLoopButton);
+            bool compactMediaControls = !(_settings.MediaShowShuffleButton && _settings.MediaShowLoopButton);
+            ViewModel.MediaInlineTransportVisibility = ToVisibility(compactMediaControls);
+            ViewModel.MediaStandardTransportVisibility = ToVisibility(!compactMediaControls);
+            ViewModel.MediaInlineSourceVisibility = ToVisibility(compactMediaControls);
+            ViewModel.MediaStandardSourceVisibility = ToVisibility(!compactMediaControls);
+            ViewModel.MediaAlbumArtSize = compactMediaControls ? 68 : 56;
             AppMenuPanel.Visibility = ToVisibility(_settings.ShowAppMenu);
 
             int barHeight = _settings.GetEffectiveBarHeight();
@@ -900,8 +920,8 @@ namespace MenuBar
                 FontFamily = new FontFamily("Segoe UI Variable, Segoe UI"),
                 FontSize = fontSize,
                 Foreground = grayed
-                    ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x5D, 255, 255, 255)) // TextFillColorDisabled dark
-                    : new SolidColorBrush(Microsoft.UI.Colors.White),
+                    ? GetThemeBrush("TextFillColorDisabledBrush", Microsoft.UI.ColorHelper.FromArgb(0x5D, 255, 255, 255))
+                    : GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White),
                 VerticalAlignment = VerticalAlignment.Center
             };
 
@@ -942,6 +962,8 @@ namespace MenuBar
                 ViewModel.MediaTitle = state.Title;
                 ViewModel.MediaArtist = state.Artist;
                 ViewModel.MediaSourceApp = string.IsNullOrWhiteSpace(state.SourceApp) ? "" : state.SourceApp;
+                ViewModel.MediaSourceAppIcon = state.SourceAppIcon;
+                ViewModel.MediaSourceAppIconVisibility = state.SourceAppIcon != null ? Visibility.Visible : Visibility.Collapsed;
                 ViewModel.MediaAlbumCover = state.AlbumCover;
                 ViewModel.MediaPlayPauseSymbol = state.Playing ? Symbol.Pause : Symbol.Play;
 
@@ -976,6 +998,8 @@ namespace MenuBar
                 ViewModel.MediaTitle = "Nothing playing";
                 ViewModel.MediaArtist = string.Empty;
                 ViewModel.MediaSourceApp = string.Empty;
+                ViewModel.MediaSourceAppIcon = null;
+                ViewModel.MediaSourceAppIconVisibility = Visibility.Collapsed;
                 ViewModel.MediaAlbumCover = null;
                 ViewModel.MediaPlayPauseSymbol = Symbol.Play;
 
@@ -1003,9 +1027,12 @@ namespace MenuBar
             {
                 ViewModel.BatteryFlyoutPercent = "AC Power";
                 ViewModel.BatteryFlyoutStatus = "No battery detected";
+                ViewModel.BatteryFlyoutProgressVisibility = Visibility.Collapsed;
                 ViewModel.BatteryFlyoutTimeVisibility = Visibility.Collapsed;
                 ViewModel.BatteryFlyoutWattageVisibility = Visibility.Collapsed;
                 ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutUsageTimeVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutDetailsVisibility = Visibility.Collapsed;
                 return;
             }
 
@@ -1013,9 +1040,12 @@ namespace MenuBar
             {
                 ViewModel.BatteryFlyoutPercent = "--%";
                 ViewModel.BatteryFlyoutStatus = "Calculating...";
+                ViewModel.BatteryFlyoutProgressVisibility = Visibility.Collapsed;
                 ViewModel.BatteryFlyoutTimeVisibility = Visibility.Collapsed;
                 ViewModel.BatteryFlyoutWattageVisibility = Visibility.Collapsed;
                 ViewModel.BatteryFlyoutProjectedVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutUsageTimeVisibility = Visibility.Collapsed;
+                ViewModel.BatteryFlyoutDetailsVisibility = Visibility.Collapsed;
                 return;
             }
 
@@ -1131,6 +1161,13 @@ namespace MenuBar
             {
                 ViewModel.BatteryFlyoutUsageTimeVisibility = Visibility.Collapsed;
             }
+
+            ViewModel.BatteryFlyoutDetailsVisibility =
+                (ViewModel.BatteryFlyoutTimeVisibility == Visibility.Visible
+                || ViewModel.BatteryFlyoutProjectedVisibility == Visibility.Visible
+                || ViewModel.BatteryFlyoutUsageTimeVisibility == Visibility.Visible)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private void UpdateNetworkFlyout()
@@ -1166,9 +1203,21 @@ namespace MenuBar
                 NetworkFlyoutStatus.Text = _networkInfo.IsLimited ? "Limited connectivity" : "Connected";
             }
 
-            if (_networkInfo.ReceiveRateMbps.HasValue)
+            if (_networkInfo.ReceiveRateMbps.HasValue || _networkInfo.TransmitRateMbps.HasValue)
             {
-                NetworkFlyoutSpeed.Text = $"Link speed: {_networkInfo.ReceiveRateMbps.Value} Mbps";
+                if (_networkInfo.ReceiveRateMbps.HasValue && _networkInfo.TransmitRateMbps.HasValue)
+                {
+                    NetworkFlyoutSpeed.Text = $"{_networkInfo.ReceiveRateMbps.Value}↓ {_networkInfo.TransmitRateMbps.Value}↑ Mbps";
+                }
+                else if (_networkInfo.ReceiveRateMbps.HasValue)
+                {
+                    NetworkFlyoutSpeed.Text = $"{_networkInfo.ReceiveRateMbps.Value}↓ Mbps";
+                }
+                else
+                {
+                    NetworkFlyoutSpeed.Text = $"{_networkInfo.TransmitRateMbps.Value}↑ Mbps";
+                }
+
                 NetworkFlyoutSpeed.Visibility = Visibility.Visible;
             }
             else
@@ -1530,7 +1579,7 @@ namespace MenuBar
             return MobileBatteryGlyphs[bucket];
         }
 
-        private SolidColorBrush GetBatteryFillBrush(int percent, bool charging, bool pluggedIn, bool energySaverOn)
+        private Brush GetBatteryFillBrush(int percent, bool charging, bool pluggedIn, bool energySaverOn)
         {
             if (charging) return _batteryChargingBrush;
             if (pluggedIn && percent < 99) return _batteryChargingBrush; // smart charging = green

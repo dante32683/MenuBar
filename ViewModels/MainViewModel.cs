@@ -118,11 +118,32 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _mediaSourceApp, value);
         }
 
+        private ImageSource _mediaSourceAppIcon;
+        public ImageSource MediaSourceAppIcon
+        {
+            get => _mediaSourceAppIcon;
+            set => SetProperty(ref _mediaSourceAppIcon, value);
+        }
+
+        private Visibility _mediaSourceAppIconVisibility = Visibility.Collapsed;
+        public Visibility MediaSourceAppIconVisibility
+        {
+            get => _mediaSourceAppIconVisibility;
+            set => SetProperty(ref _mediaSourceAppIconVisibility, value);
+        }
+
         private double _mediaShuffleOpacity = 0.5;
         public double MediaShuffleOpacity
         {
             get => _mediaShuffleOpacity;
             set => SetProperty(ref _mediaShuffleOpacity, value);
+        }
+
+        private Visibility _mediaShuffleVisibility = Visibility.Visible;
+        public Visibility MediaShuffleVisibility
+        {
+            get => _mediaShuffleVisibility;
+            set => SetProperty(ref _mediaShuffleVisibility, value);
         }
 
         private string _mediaRepeatIcon = "\uE8EE";
@@ -137,6 +158,48 @@ namespace MenuBar.ViewModels
         {
             get => _mediaRepeatOpacity;
             set => SetProperty(ref _mediaRepeatOpacity, value);
+        }
+
+        private Visibility _mediaRepeatVisibility = Visibility.Visible;
+        public Visibility MediaRepeatVisibility
+        {
+            get => _mediaRepeatVisibility;
+            set => SetProperty(ref _mediaRepeatVisibility, value);
+        }
+
+        private Visibility _mediaStandardTransportVisibility = Visibility.Visible;
+        public Visibility MediaStandardTransportVisibility
+        {
+            get => _mediaStandardTransportVisibility;
+            set => SetProperty(ref _mediaStandardTransportVisibility, value);
+        }
+
+        private Visibility _mediaInlineTransportVisibility = Visibility.Collapsed;
+        public Visibility MediaInlineTransportVisibility
+        {
+            get => _mediaInlineTransportVisibility;
+            set => SetProperty(ref _mediaInlineTransportVisibility, value);
+        }
+
+        private Visibility _mediaInlineSourceVisibility = Visibility.Collapsed;
+        public Visibility MediaInlineSourceVisibility
+        {
+            get => _mediaInlineSourceVisibility;
+            set => SetProperty(ref _mediaInlineSourceVisibility, value);
+        }
+
+        private Visibility _mediaStandardSourceVisibility = Visibility.Visible;
+        public Visibility MediaStandardSourceVisibility
+        {
+            get => _mediaStandardSourceVisibility;
+            set => SetProperty(ref _mediaStandardSourceVisibility, value);
+        }
+
+        private double _mediaAlbumArtSize = 56;
+        public double MediaAlbumArtSize
+        {
+            get => _mediaAlbumArtSize;
+            set => SetProperty(ref _mediaAlbumArtSize, value);
         }
 
         private double _mediaPositionSeconds = 0;
@@ -165,6 +228,13 @@ namespace MenuBar.ViewModels
         {
             get => _mediaDurationText;
             set => SetProperty(ref _mediaDurationText, value);
+        }
+
+        private Visibility _mediaFlyoutProgressVisibility = Visibility.Visible;
+        public Visibility MediaFlyoutProgressVisibility
+        {
+            get => _mediaFlyoutProgressVisibility;
+            set => SetProperty(ref _mediaFlyoutProgressVisibility, value);
         }
 
         private ImageSource _mediaAlbumCover;
@@ -405,6 +475,13 @@ namespace MenuBar.ViewModels
         {
             get => _batteryFlyoutUsageTimeVisibility;
             set => SetProperty(ref _batteryFlyoutUsageTimeVisibility, value);
+        }
+
+        private Visibility _batteryFlyoutDetailsVisibility = Visibility.Collapsed;
+        public Visibility BatteryFlyoutDetailsVisibility
+        {
+            get => _batteryFlyoutDetailsVisibility;
+            set => SetProperty(ref _batteryFlyoutDetailsVisibility, value);
         }
     }
 }
