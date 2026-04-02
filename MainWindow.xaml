@@ -16,6 +16,33 @@
                 <Setter Property="FontFamily" Value="Segoe UI Variable" />
             </Style>
 
+            <Style x:Key="AppMenuItemBorderStyle" TargetType="Border">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="CornerRadius" Value="4" />
+                <Setter Property="Padding" Value="8,0,8,0" />
+                <Setter Property="Margin" Value="0,3,0,0" />
+                <Setter Property="VerticalAlignment" Value="Stretch" />
+            </Style>
+
+            <Style x:Key="AppMenuItemHostStyle" TargetType="Grid">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Margin" Value="0,-3,0,0" />
+                <Setter Property="VerticalAlignment" Value="Stretch" />
+            </Style>
+
+            <Style x:Key="AppMenuItemTextStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <Style x:Key="AppMenuItemTextDisabledStyle"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource AppMenuItemTextStyle}">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorDisabledBrush}" />
+            </Style>
+
             <LinearGradientBrush x:Key="MediaArtFallbackBrush" StartPoint="0,0" EndPoint="1,1">
                 <GradientStop Color="#2AFFFFFF" Offset="0" />
                 <GradientStop Color="#14FFFFFF" Offset="0.45" />

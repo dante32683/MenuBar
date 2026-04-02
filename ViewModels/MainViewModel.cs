@@ -167,40 +167,36 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _mediaRepeatVisibility, value);
         }
 
-        private Visibility _mediaStandardTransportVisibility = Visibility.Visible;
-        public Visibility MediaStandardTransportVisibility
+        private bool _isMediaInlineLayout;
+        public bool IsMediaInlineLayout
         {
-            get => _mediaStandardTransportVisibility;
-            set => SetProperty(ref _mediaStandardTransportVisibility, value);
+            get => _isMediaInlineLayout;
+            set
+            {
+                if (SetProperty(ref _isMediaInlineLayout, value))
+                {
+                    OnPropertyChanged(nameof(MediaStandardTransportVisibility));
+                    OnPropertyChanged(nameof(MediaInlineTransportVisibility));
+                    OnPropertyChanged(nameof(MediaInlineSourceVisibility));
+                    OnPropertyChanged(nameof(MediaStandardSourceVisibility));
+                    OnPropertyChanged(nameof(MediaAlbumArtSize));
+                }
+            }
         }
 
-        private Visibility _mediaInlineTransportVisibility = Visibility.Collapsed;
-        public Visibility MediaInlineTransportVisibility
-        {
-            get => _mediaInlineTransportVisibility;
-            set => SetProperty(ref _mediaInlineTransportVisibility, value);
-        }
+        public Visibility MediaStandardTransportVisibility =>
+            IsMediaInlineLayout ? Visibility.Collapsed : Visibility.Visible;
 
-        private Visibility _mediaInlineSourceVisibility = Visibility.Collapsed;
-        public Visibility MediaInlineSourceVisibility
-        {
-            get => _mediaInlineSourceVisibility;
-            set => SetProperty(ref _mediaInlineSourceVisibility, value);
-        }
+        public Visibility MediaInlineTransportVisibility =>
+            IsMediaInlineLayout ? Visibility.Visible : Visibility.Collapsed;
 
-        private Visibility _mediaStandardSourceVisibility = Visibility.Visible;
-        public Visibility MediaStandardSourceVisibility
-        {
-            get => _mediaStandardSourceVisibility;
-            set => SetProperty(ref _mediaStandardSourceVisibility, value);
-        }
+        public Visibility MediaInlineSourceVisibility =>
+            IsMediaInlineLayout ? Visibility.Visible : Visibility.Collapsed;
 
-        private double _mediaAlbumArtSize = 56;
-        public double MediaAlbumArtSize
-        {
-            get => _mediaAlbumArtSize;
-            set => SetProperty(ref _mediaAlbumArtSize, value);
-        }
+        public Visibility MediaStandardSourceVisibility =>
+            IsMediaInlineLayout ? Visibility.Collapsed : Visibility.Visible;
+
+        public double MediaAlbumArtSize => IsMediaInlineLayout ? 68 : 56;
 
         private double _mediaPositionSeconds = 0;
         public double MediaPositionSeconds

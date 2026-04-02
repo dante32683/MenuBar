@@ -9,6 +9,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -539,12 +540,7 @@ namespace MenuBar
             ViewModel.MediaFlyoutProgressVisibility = ToVisibility(_settings.MediaShowProgressBar);
             ViewModel.MediaShuffleVisibility = ToVisibility(_settings.MediaShowShuffleButton);
             ViewModel.MediaRepeatVisibility = ToVisibility(_settings.MediaShowLoopButton);
-            bool compactMediaControls = !(_settings.MediaShowShuffleButton && _settings.MediaShowLoopButton);
-            ViewModel.MediaInlineTransportVisibility = ToVisibility(compactMediaControls);
-            ViewModel.MediaStandardTransportVisibility = ToVisibility(!compactMediaControls);
-            ViewModel.MediaInlineSourceVisibility = ToVisibility(compactMediaControls);
-            ViewModel.MediaStandardSourceVisibility = ToVisibility(!compactMediaControls);
-            ViewModel.MediaAlbumArtSize = compactMediaControls ? 68 : 56;
+            ViewModel.IsMediaInlineLayout = !(_settings.MediaShowShuffleButton && _settings.MediaShowLoopButton);
             AppMenuPanel.Visibility = ToVisibility(_settings.ShowAppMenu);
 
             int barHeight = _settings.GetEffectiveBarHeight();
@@ -917,31 +913,34 @@ namespace MenuBar
             var textBlock = new TextBlock
             {
                 Text = label,
-                FontFamily = new FontFamily("Segoe UI Variable, Segoe UI"),
                 FontSize = fontSize,
-                Foreground = grayed
-                    ? GetThemeBrush("TextFillColorDisabledBrush", Microsoft.UI.ColorHelper.FromArgb(0x5D, 255, 255, 255))
-                    : GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White),
-                VerticalAlignment = VerticalAlignment.Center
+                Style = (Style)RootGrid.Resources[grayed
+                    ? "AppMenuItemTextDisabledStyle"
+                    : "AppMenuItemTextStyle"]
             };
 
             var border = new Border
             {
-                Background = _transparentBrush,
-                CornerRadius = new CornerRadius(4), // ControlCornerRadius
-                Padding = new Thickness(8, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Stretch,
+                Style = (Style)RootGrid.Resources["AppMenuItemBorderStyle"],
                 Tag = tag,
                 Child = textBlock
             };
 
             if (!grayed)
             {
-                border.PointerEntered += Host_PointerEntered;
-                border.PointerExited += Host_PointerExited;
-                border.PointerPressed += Host_PointerPressed;
-                border.PointerReleased += Host_PointerReleased;
-                border.Tapped += AppMenuItem_Tapped;
+                var host = new Grid
+                {
+                    Style = (Style)RootGrid.Resources["AppMenuItemHostStyle"],
+                    Tag = tag
+                };
+                host.Children.Add(border);
+                host.PointerEntered += Host_PointerEntered;
+                host.PointerExited += Host_PointerExited;
+                host.PointerPressed += Host_PointerPressed;
+                host.PointerReleased += Host_PointerReleased;
+                host.Tapped += AppMenuItem_Tapped;
+                AppMenuPanel.Children.Add(host);
+                return;
             }
 
             AppMenuPanel.Children.Add(border);
@@ -1178,6 +1177,7 @@ namespace MenuBar
                 NetworkFlyoutName.Text = "Not connected";
                 NetworkFlyoutStatus.Text = "No internet access";
                 NetworkFlyoutSpeed.Visibility = Visibility.Collapsed;
+                NetworkFlyoutSpeed.Inlines.Clear();
                 return;
             }
 
@@ -1207,15 +1207,15 @@ namespace MenuBar
             {
                 if (_networkInfo.ReceiveRateMbps.HasValue && _networkInfo.TransmitRateMbps.HasValue)
                 {
-                    NetworkFlyoutSpeed.Text = $"{_networkInfo.ReceiveRateMbps.Value}↓ {_networkInfo.TransmitRateMbps.Value}↑ Mbps";
+                    SetNetworkFlyoutSpeedText(_networkInfo.ReceiveRateMbps.Value, _networkInfo.TransmitRateMbps.Value);
                 }
                 else if (_networkInfo.ReceiveRateMbps.HasValue)
                 {
-                    NetworkFlyoutSpeed.Text = $"{_networkInfo.ReceiveRateMbps.Value}↓ Mbps";
+                    SetNetworkFlyoutSpeedText(_networkInfo.ReceiveRateMbps.Value, null);
                 }
                 else
                 {
-                    NetworkFlyoutSpeed.Text = $"{_networkInfo.TransmitRateMbps.Value}↑ Mbps";
+                    SetNetworkFlyoutSpeedText(null, _networkInfo.TransmitRateMbps.Value);
                 }
 
                 NetworkFlyoutSpeed.Visibility = Visibility.Visible;
@@ -1223,6 +1223,42 @@ namespace MenuBar
             else
             {
                 NetworkFlyoutSpeed.Visibility = Visibility.Collapsed;
+                NetworkFlyoutSpeed.Inlines.Clear();
+            }
+        }
+
+        private void SetNetworkFlyoutSpeedText(int? downMbps, int? upMbps)
+        {
+            NetworkFlyoutSpeed.Inlines.Clear();
+
+            SolidColorBrush valueBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
+            SolidColorBrush arrowBrush = GetThemeBrush("TextFillColorSecondaryBrush", Microsoft.UI.ColorHelper.FromArgb(0xC5, 255, 255, 255));
+            SolidColorBrush unitBrush = GetThemeBrush("TextFillColorSecondaryBrush", Microsoft.UI.ColorHelper.FromArgb(0xC5, 255, 255, 255));
+
+            void AddValueWithArrow(int value, string arrow)
+            {
+                NetworkFlyoutSpeed.Inlines.Add(new Run { Text = value.ToString(), Foreground = valueBrush });
+                NetworkFlyoutSpeed.Inlines.Add(new Run { Text = $" {arrow}", Foreground = arrowBrush });
+            }
+
+            if (downMbps.HasValue)
+            {
+                AddValueWithArrow(downMbps.Value, "\u2193");
+            }
+
+            if (upMbps.HasValue)
+            {
+                if (downMbps.HasValue)
+                {
+                    NetworkFlyoutSpeed.Inlines.Add(new Run { Text = "   ", Foreground = unitBrush });
+                }
+
+                AddValueWithArrow(upMbps.Value, "\u2191");
+            }
+
+            if (downMbps.HasValue || upMbps.HasValue)
+            {
+                NetworkFlyoutSpeed.Inlines.Add(new Run { Text = " Mbps", Foreground = unitBrush });
             }
         }
 
@@ -1329,8 +1365,15 @@ namespace MenuBar
 
         private void AppMenuItem_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            if (sender is not Border border) return;
-            if (border.Tag is not AppMenuItem item) return;
+            if (GetHostBorder(sender) is not Border border) return;
+
+            AppMenuItem item = sender switch
+            {
+                Border directBorder => directBorder.Tag as AppMenuItem,
+                Grid grid => grid.Tag as AppMenuItem ?? border.Tag as AppMenuItem,
+                _ => border.Tag as AppMenuItem
+            };
+            if (item == null) return;
 
             if (item.SubMenuHandle != IntPtr.Zero)
             {
