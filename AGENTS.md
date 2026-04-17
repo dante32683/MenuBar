@@ -50,6 +50,6 @@ Recent commit messages are short and direct, for example `bug fixes and battery 
   - build status (`dotnet build` / publish result)
 
 ## Configuration Notes
-- `bar_height` currently supports `26–56`.
+- `bar_height` currently supports `24–56`.
 - Keep `settings.json` help text in sync with `MenuBarSettings`.
 - Avoid editing generated folders such as `bin/`, `obj/`, or `publish/` by hand.

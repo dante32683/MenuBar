@@ -660,6 +660,30 @@
                     </Grid>
 
                     <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
+                    <Grid Visibility="{x:Bind ViewModel.PhoneVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          VerticalAlignment="Stretch"
+                          Margin="0,-3,0,0"
+                          PointerEntered="Host_PointerEntered"
+                          PointerExited="Host_PointerExited"
+                          PointerPressed="Host_PointerPressed"
+                          PointerReleased="Host_PointerReleased"
+                          Tapped="PhoneHost_Tapped">
+                        <Border x:Name="PhoneHost"
+                                Background="Transparent"
+                                CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
+                                Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
+                                Margin="0,3,0,0"
+                                VerticalAlignment="Stretch">
+                            <TextBlock Text="&#xF6C6;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+
+                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
                     <Grid Visibility="{x:Bind ViewModel.NetworkVisibility, Mode=OneWay}"
                           Background="Transparent"
                           VerticalAlignment="Stretch"
@@ -902,6 +926,7 @@
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                       Margin="{x:Bind ViewModel.BatteryTextMargin, Mode=OneWay}"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>

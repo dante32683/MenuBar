@@ -303,6 +303,13 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _clockVisibility, value);
         }
 
+        private Visibility _phoneVisibility = Visibility.Collapsed;
+        public Visibility PhoneVisibility
+        {
+            get => _phoneVisibility;
+            set => SetProperty(ref _phoneVisibility, value);
+        }
+
         private double _iconFontSize = 14;
         public double IconFontSize
         {
@@ -312,9 +319,21 @@ namespace MenuBar.ViewModels
                 if (SetProperty(ref _iconFontSize, value))
                 {
                     OnPropertyChanged(nameof(FlyoutIconFontSize));
+                    OnPropertyChanged(nameof(BatteryTextMargin));
                 }
             }
         }
+
+        // Negative top margin shifts the battery % text upward to compensate for Segoe Fluent Icons'
+        // glyph sitting in the upper portion of its em square vs Segoe UI Variable's baseline.
+        // Must be negative top (not positive bottom): Segoe Fluent Icons and Segoe UI Variable have
+        // nearly identical layout heights at the TextFontSize/IconFontSize ratio used here, so a
+        // positive bottom margin would inflate the text's measured height past the icon's, making it
+        // the StackPanel height reference and pushing the text to the top of its slot.
+        // Negative top margin shifts without inflating measured height; factor 0.115 scales with
+        // bar_height via IconFontSize (all in DIPs, so DPI is already handled by the framework).
+        public Thickness BatteryTextMargin =>
+            new Thickness(0, -Math.Round(_iconFontSize * 0.115), 0, 0);
 
         private double _textFontSize = 11;
         public double TextFontSize

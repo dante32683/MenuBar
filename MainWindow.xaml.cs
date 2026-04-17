@@ -29,6 +29,7 @@ namespace MenuBar
         private readonly MediaService _mediaService;
         private readonly BatteryUsageTracker _batteryUsageTracker = new BatteryUsageTracker();
         private string _batteryUsageTimeText;
+        private string _phoneCommand = "";
 
         private readonly Brush _mediaPlayingBrush;
         private readonly Brush _mediaPausedBrush;
@@ -140,26 +141,32 @@ namespace MenuBar
 
         private IntPtr NewWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, uint uIdSubclass, IntPtr dwRefData)
         {
-            if (uMsg == _taskbarCreatedMsg)
+            // Exceptions must not escape a native callback — they cross the managed/native
+            // boundary and corrupt the call stack, causing an unrecoverable crash.
+            try
             {
-                // Explorer restart wipes the shell's AppBar list — force ABM_NEW regardless of prior state
-                _appBarRegistered = false;
-                if (_isFullscreenActive)
+                if (uMsg == _taskbarCreatedMsg)
                 {
-                    // Bar was hidden for fullscreen; re-surface it since the shell state was reset
-                    _isFullscreenActive = false;
-                    NativeMethods.ShowWindow(_hwnd, NativeMethods.SW_SHOWNA);
+                    // Explorer restart wipes the shell's AppBar list — force ABM_NEW regardless of prior state
+                    _appBarRegistered = false;
+                    if (_isFullscreenActive)
+                    {
+                        // Bar was hidden for fullscreen; re-surface it since the shell state was reset
+                        _isFullscreenActive = false;
+                        NativeMethods.ShowWindow(_hwnd, NativeMethods.SW_SHOWNA);
+                    }
+                    RegisterOrUpdateAppBar(registerIfNeeded: true);
                 }
-                RegisterOrUpdateAppBar(registerIfNeeded: true);
+                else if (uMsg == NativeMethods.WM_DPICHANGED)
+                {
+                    RegisterOrUpdateAppBar(registerIfNeeded: false);
+                }
+                else if (uMsg == NativeMethods.WM_DISPLAYCHANGE)
+                {
+                    RegisterOrUpdateAppBar(registerIfNeeded: false);
+                }
             }
-            else if (uMsg == NativeMethods.WM_DPICHANGED)
-            {
-                RegisterOrUpdateAppBar(registerIfNeeded: false);
-            }
-            else if (uMsg == NativeMethods.WM_DISPLAYCHANGE)
-            {
-                RegisterOrUpdateAppBar(registerIfNeeded: false);
-            }
+            catch { }
 
             return NativeMethods.DefSubclassProc(hWnd, uMsg, wParam, lParam);
         }
@@ -303,40 +310,56 @@ namespace MenuBar
         private void OnForegroundEvent(IntPtr hook, uint eventType, IntPtr hwnd,
             int idObject, int idChild, uint threadId, uint time)
         {
-            if (hwnd != IntPtr.Zero && hwnd != _hwnd)
-                _lastExternalForegroundHwnd = hwnd;
-            if (hwnd != IntPtr.Zero)
-                CheckAndApplyFullscreenState(hwnd);
-            UpdateActiveWindow();
-            // UpdateVirtualDesktop is NOT called here — CurrentVirtualDesktop only changes
-            // on desktop switches, which are handled by OnDesktopSwitchEvent exclusively.
+            try
+            {
+                if (hwnd != IntPtr.Zero && hwnd != _hwnd)
+                    _lastExternalForegroundHwnd = hwnd;
+                if (hwnd != IntPtr.Zero)
+                    CheckAndApplyFullscreenState(hwnd);
+                UpdateActiveWindow();
+                // UpdateVirtualDesktop is NOT called here — CurrentVirtualDesktop only changes
+                // on desktop switches, which are handled by OnDesktopSwitchEvent exclusively.
+            }
+            catch { }
         }
 
         private void OnDesktopSwitchEvent(IntPtr hook, uint eventType, IntPtr hwnd,
             int idObject, int idChild, uint threadId, uint time)
         {
-            _appMenuTargetHwnd = IntPtr.Zero; // force menu rebuild on next foreground event
-            // The registry CurrentVirtualDesktop key is not yet updated when this event fires.
-            // A short delay lets the OS finish the switch before we read the new label.
-            DispatcherQueue.TryEnqueue(async () =>
+            try
             {
-                await Task.Delay(50);
-                UpdateVirtualDesktop();
-            });
+                _appMenuTargetHwnd = IntPtr.Zero; // force menu rebuild on next foreground event
+                // The registry CurrentVirtualDesktop key is not yet updated when this event fires.
+                // A short delay lets the OS finish the switch before we read the new label.
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(50);
+                        UpdateVirtualDesktop();
+                    }
+                    catch { }
+                });
+            }
+            catch { }
         }
 
         private void OnTitleChangeEvent(IntPtr hook, uint eventType, IntPtr hwnd,
             int idObject, int idChild, uint threadId, uint time)
         {
-            if (hwnd == NativeMethods.GetForegroundWindow())
+            try
             {
-                UpdateActiveWindow();
-                // A browser exiting HTML5 fullscreen (e.g. YouTube) keeps the same foreground
-                // window — EVENT_SYSTEM_FOREGROUND never fires. The title change is our signal
-                // that the browser may have resized; re-check fullscreen state immediately.
-                if (_isFullscreenActive)
-                    CheckAndApplyFullscreenState(hwnd);
+                if (hwnd == NativeMethods.GetForegroundWindow())
+                {
+                    UpdateActiveWindow();
+                    // A browser exiting HTML5 fullscreen (e.g. YouTube) keeps the same foreground
+                    // window — EVENT_SYSTEM_FOREGROUND never fires. The title change is our signal
+                    // that the browser may have resized; re-check fullscreen state immediately.
+                    if (_isFullscreenActive)
+                        CheckAndApplyFullscreenState(hwnd);
+                }
             }
+            catch { }
         }
 
         private static bool IsShellWindow(IntPtr hwnd)
@@ -480,17 +503,32 @@ namespace MenuBar
 
         private void OnMediaStateChanged(MediaService.MediaState state)
         {
-            ApplyMediaState(state);
+            try { ApplyMediaState(state); }
+            catch { }
         }
 
         #endregion
 
         #region Settings
 
+        private static string LoadEnvValue(string key)
+        {
+            var envPath = Path.Combine(AppContext.BaseDirectory, ".env");
+            if (!File.Exists(envPath)) return "";
+            foreach (var line in File.ReadAllLines(envPath))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))
+                    return trimmed.Substring(key.Length + 1);
+            }
+            return "";
+        }
+
         private void LoadSettings(bool applyLayout)
         {
             SettingsService.EnsureExists();
             _settings = SettingsService.Load();
+            _phoneCommand = LoadEnvValue("PHONE_COMMAND");
             ApplySettings();
 
             if (applyLayout)
@@ -537,6 +575,7 @@ namespace MenuBar
             ViewModel.BatteryVisibility = ToVisibility(_settings.ShowBattery);
             ViewModel.ClockVisibility = ToVisibility(_settings.ShowClock);
             ViewModel.VirtualDesktopVisibility = ToVisibility(_settings.ShowVirtualDesktop);
+            ViewModel.PhoneVisibility = ToVisibility(_settings.ShowPhone);
             ViewModel.MediaFlyoutProgressVisibility = ToVisibility(_settings.MediaShowProgressBar);
             ViewModel.MediaShuffleVisibility = ToVisibility(_settings.MediaShowShuffleButton);
             ViewModel.MediaRepeatVisibility = ToVisibility(_settings.MediaShowLoopButton);
@@ -545,7 +584,7 @@ namespace MenuBar
 
             int barHeight = _settings.GetEffectiveBarHeight();
             ViewModel.IconFontSize = _settings.FontSizeIcon > 0 ? _settings.FontSizeIcon : barHeight * 0.62;
-            ViewModel.TextFontSize = _settings.FontSizeText > 0 ? _settings.FontSizeText : barHeight * 0.44;
+            ViewModel.TextFontSize = _settings.FontSizeText > 0 ? _settings.FontSizeText : barHeight * 0.46;
             double hPad = Math.Round(barHeight * 0.29);
             ViewModel.HostCornerRadius = new CornerRadius(Math.Round(barHeight * 0.21));
             ViewModel.HostPadding = new Thickness(hPad, 0, hPad, 0);
@@ -817,95 +856,103 @@ namespace MenuBar
 
         private async void RefreshAppMenu()
         {
-            if (!_settings.ShowAppMenu) return;
-
-            IntPtr foreground = NativeMethods.GetForegroundWindow();
-            if (foreground == IntPtr.Zero || foreground == _hwnd)
-            {
-                AppMenuPanel.Children.Clear();
-                _appMenuTargetHwnd = IntPtr.Zero;
-                return;
-            }
-
-            // Walk to root — GetMenu only works on the top-level frame, not child controls
-            IntPtr hwnd = NativeMethods.GetAncestor(foreground, NativeMethods.GA_ROOT);
-            if (hwnd == IntPtr.Zero || hwnd == _hwnd) hwnd = foreground;
-
-            // Skip rebuild if targeting the same window
-            if (hwnd == _appMenuTargetHwnd) return;
-            _appMenuTargetHwnd = hwnd;
-
-            AppMenuPanel.Children.Clear();
-
-            IntPtr hMenu = NativeMethods.GetMenu(hwnd);
-            if (hMenu == IntPtr.Zero)
-            {
-                // No Win32 HMENU — try UI Automation (WPF apps, VS Code, Win11 Notepad, etc.) on background thread
-                var uiaItems = await UiaMenuService.GetMenuItemsAsync(hwnd);
-                if (uiaItems != null && hwnd == _appMenuTargetHwnd)
-                {
-                    DispatcherQueue.TryEnqueue(() =>
-                    {
-                        // Verify we are still targeting the same window after the async wait
-                        if (hwnd != _appMenuTargetHwnd) return;
-
-                        double uiaFontSize = ViewModel.TextFontSize;
-                        foreach (var uiaItem in uiaItems)
-                        {
-                            AddMenuItemBorder(uiaItem.Label, false, uiaFontSize,
-                                new AppMenuItem { TargetHwnd = hwnd, UiaElement = uiaItem.Element });
-                        }
-                    });
-                }
-                return;
-            }
-
-            int count = NativeMethods.GetMenuItemCount(hMenu);
-            if (count <= 0) return;
-
-            double fontSize = ViewModel.TextFontSize;
-
-            // Allocate a single native buffer for all GetMenuItemInfo calls in this loop.
-            // Using IntPtr avoids relying on the managed-string P/Invoke marshaling path,
-            // which does not reliably round-trip the written text back into mii.dwTypeData.
-            const int bufChars = 256;
-            IntPtr textBuf = Marshal.AllocHGlobal(bufChars * 2); // UTF-16, 2 bytes per char
             try
             {
-                for (uint i = 0; i < (uint)count; i++)
+                if (!_settings.ShowAppMenu) return;
+
+                IntPtr foreground = NativeMethods.GetForegroundWindow();
+                if (foreground == IntPtr.Zero || foreground == _hwnd)
                 {
-                    // Zero the buffer so PtrToStringUni gets a clean null-terminated string
-                    // even if GetMenuItemInfo writes fewer characters than expected.
-                    Marshal.WriteInt16(textBuf, 0);
+                    AppMenuPanel.Children.Clear();
+                    _appMenuTargetHwnd = IntPtr.Zero;
+                    return;
+                }
 
-                    var mii = new NativeMethods.MENUITEMINFO
+                // Walk to root — GetMenu only works on the top-level frame, not child controls
+                IntPtr hwnd = NativeMethods.GetAncestor(foreground, NativeMethods.GA_ROOT);
+                if (hwnd == IntPtr.Zero || hwnd == _hwnd) hwnd = foreground;
+
+                // Skip rebuild if targeting the same window
+                if (hwnd == _appMenuTargetHwnd) return;
+                _appMenuTargetHwnd = hwnd;
+
+                AppMenuPanel.Children.Clear();
+
+                IntPtr hMenu = NativeMethods.GetMenu(hwnd);
+                if (hMenu == IntPtr.Zero)
+                {
+                    // No Win32 HMENU — try UI Automation (WPF apps, VS Code, Win11 Notepad, etc.) on background thread
+                    var uiaItems = await UiaMenuService.GetMenuItemsAsync(hwnd);
+                    if (uiaItems != null && hwnd == _appMenuTargetHwnd)
                     {
-                        cbSize = (uint)Marshal.SizeOf<NativeMethods.MENUITEMINFO>(),
-                        fMask = NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE |
-                                NativeMethods.MIIM_STRING | NativeMethods.MIIM_SUBMENU,
-                        dwTypeData = textBuf,
-                        cch = bufChars - 1  // leave room for null terminator
-                    };
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            try
+                            {
+                                // Verify we are still targeting the same window after the async wait
+                                if (hwnd != _appMenuTargetHwnd) return;
 
-                    if (!NativeMethods.GetMenuItemInfo(hMenu, i, true, ref mii)) continue;
-                    if ((mii.fType & NativeMethods.MFT_SEPARATOR) != 0) continue;
-                    if ((mii.fType & NativeMethods.MFT_BITMAP) != 0) continue;
+                                double uiaFontSize = ViewModel.TextFontSize;
+                                foreach (var uiaItem in uiaItems)
+                                {
+                                    AddMenuItemBorder(uiaItem.Label, false, uiaFontSize,
+                                        new AppMenuItem { TargetHwnd = hwnd, UiaElement = uiaItem.Element });
+                                }
+                            }
+                            catch { }
+                        });
+                    }
+                    return;
+                }
 
-                    string raw = Marshal.PtrToStringUni(textBuf) ?? string.Empty;
-                    string label = raw.Split('\t')[0].Replace("&", string.Empty).Trim();
-                    if (string.IsNullOrWhiteSpace(label)) continue;
+                int count = NativeMethods.GetMenuItemCount(hMenu);
+                if (count <= 0) return;
 
-                    bool grayed = (mii.fState & NativeMethods.MFS_GRAYED) != 0;
-                    IntPtr subMenu = mii.hSubMenu;
+                double fontSize = ViewModel.TextFontSize;
 
-                    AddMenuItemBorder(label, grayed, fontSize,
-                        new AppMenuItem { Index = i, TargetHwnd = hwnd, SubMenuHandle = subMenu });
+                // Allocate a single native buffer for all GetMenuItemInfo calls in this loop.
+                // Using IntPtr avoids relying on the managed-string P/Invoke marshaling path,
+                // which does not reliably round-trip the written text back into mii.dwTypeData.
+                const int bufChars = 256;
+                IntPtr textBuf = Marshal.AllocHGlobal(bufChars * 2); // UTF-16, 2 bytes per char
+                try
+                {
+                    for (uint i = 0; i < (uint)count; i++)
+                    {
+                        // Zero the buffer so PtrToStringUni gets a clean null-terminated string
+                        // even if GetMenuItemInfo writes fewer characters than expected.
+                        Marshal.WriteInt16(textBuf, 0);
+
+                        var mii = new NativeMethods.MENUITEMINFO
+                        {
+                            cbSize = (uint)Marshal.SizeOf<NativeMethods.MENUITEMINFO>(),
+                            fMask = NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE |
+                                    NativeMethods.MIIM_STRING | NativeMethods.MIIM_SUBMENU,
+                            dwTypeData = textBuf,
+                            cch = bufChars - 1  // leave room for null terminator
+                        };
+
+                        if (!NativeMethods.GetMenuItemInfo(hMenu, i, true, ref mii)) continue;
+                        if ((mii.fType & NativeMethods.MFT_SEPARATOR) != 0) continue;
+                        if ((mii.fType & NativeMethods.MFT_BITMAP) != 0) continue;
+
+                        string raw = Marshal.PtrToStringUni(textBuf) ?? string.Empty;
+                        string label = raw.Split('\t')[0].Replace("&", string.Empty).Trim();
+                        if (string.IsNullOrWhiteSpace(label)) continue;
+
+                        bool grayed = (mii.fState & NativeMethods.MFS_GRAYED) != 0;
+                        IntPtr subMenu = mii.hSubMenu;
+
+                        AddMenuItemBorder(label, grayed, fontSize,
+                            new AppMenuItem { Index = i, TargetHwnd = hwnd, SubMenuHandle = subMenu });
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(textBuf);
                 }
             }
-            finally
-            {
-                Marshal.FreeHGlobal(textBuf);
-            }
+            catch { }
         }
 
         private void AddMenuItemBorder(string label, bool grayed, double fontSize, AppMenuItem tag)
@@ -1401,6 +1448,23 @@ namespace MenuBar
                 // The dropdown opens in the target app's window at its original position.
                 UiaMenuService.ExpandOrInvokeMenuItem(item.UiaElement);
             }
+        }
+
+        private void PhoneHost_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_phoneCommand)) return;
+                var spaceIdx = _phoneCommand.IndexOf(' ');
+                var exe = spaceIdx >= 0 ? _phoneCommand.Substring(0, spaceIdx) : _phoneCommand;
+                var args = spaceIdx >= 0 ? _phoneCommand.Substring(spaceIdx + 1) : "";
+                Process.Start(new ProcessStartInfo(exe, args)
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+                });
+            }
+            catch { }
         }
 
         private void ClockHost_Tapped(object sender, TappedRoutedEventArgs e)

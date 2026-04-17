@@ -10,6 +10,12 @@ namespace MenuBar
         public App()
         {
             this.InitializeComponent();
+
+            // Prevent unhandled UI-thread exceptions from silently crashing the process.
+            this.UnhandledException += (_, e) => e.Handled = true;
+
+            // Prevent unobserved task exceptions from crashing in edge cases.
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => e.SetObserved();
         }
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)

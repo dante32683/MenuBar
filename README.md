@@ -54,7 +54,7 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 
 | Key | Default | What it does |
 |-----|---------|--------------|
-| `bar_height` | `28` | Height in px (26–56) |
+| `bar_height` | `28` | Height in px (24–56) |
 | `show_windows_logo` | `false` | Show a Windows logo with power menu on the left |
 | `show_title` | `true` | Show active window title and icon |
 | `show_app_menu` | `false` | Show the active app's menus (File, Edit, etc.) |

@@ -273,7 +273,7 @@ namespace MenuBar.Services
             }
             catch { }
 
-            StateChanged?.Invoke(CurrentState);
+            try { StateChanged?.Invoke(CurrentState); } catch { }
         }
 
         private static string FormatSourceApp(string aumid)
@@ -566,6 +566,10 @@ namespace MenuBar.Services
 
         public void Dispose()
         {
+            // Stop the timer first so no more Tick callbacks fire after disposal.
+            _progressTimer.Stop();
+            // Clear subscribers before detaching the session so no post-close UI callbacks occur.
+            StateChanged = null;
             AttachSession(null);
             if (_manager != null)
             {

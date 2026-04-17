@@ -85,6 +85,9 @@ namespace MenuBar.Services
         [JsonPropertyName("battery_show_usage_time")]
         public bool BatteryShowUsageTime { get; set; } = true;
 
+        [JsonPropertyName("show_phone")]
+        public bool ShowPhone { get; set; } = false;
+
         public static MenuBarSettings CreateDefault()
         {
             return new MenuBarSettings();
@@ -92,7 +95,7 @@ namespace MenuBar.Services
 
         public int GetEffectiveBarHeight()
         {
-            return Math.Clamp(BarHeight, 26, 56);
+            return Math.Clamp(BarHeight, 24, 56);
         }
 
         public void Normalize()

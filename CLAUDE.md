@@ -30,33 +30,43 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 
 **Event sources (event-driven, minimal polling):**
 - Active window title: `EVENT_SYSTEM_FOREGROUND` + `EVENT_OBJECT_NAMECHANGE`
-- Virtual desktop: `EVENT_SYSTEM_DESKTOPSWITCH` + 1s clock timer (hook unreliable from AppBar)
-- Volume Control: `PointerWheelChanged` on RootGrid; cumulative delta threshold (120 units) triggers `keybd_event` for volume up/down
+- Virtual desktop: `EVENT_SYSTEM_DESKTOPSWITCH` + 1s clock timer
+- Volume scroll: `PointerWheelChanged` on RootGrid; cumulative delta threshold (120 units) → `keybd_event`
 - Clock / virtual desktop / fullscreen check: `DispatcherTimer` every 1s
 - Battery: `Battery.AggregateBattery.ReportUpdated` + `DispatcherTimer` every 10s
 - Media: `MediaService` event subscriptions; 100ms high-frequency updates while flyout is open
 
 ## Key Patterns & Gotchas
 
-**Flyout attachment:** Flyouts attach to the **inner `Border`** (`XxxHost`), not the outer wrapper `Grid`. Always call `ToggleAttachedFlyout(GetHostBorder(sender))` — `Tapped` fires on the outer `Grid`, so using `(FrameworkElement)sender` directly targets the wrong element.
+**Flyout attachment:** Flyouts attach to the **inner `Border`** (`XxxHost`), not the outer wrapper `Grid`. Always call `ToggleAttachedFlyout(GetHostBorder(sender))`.
 
 **Flyout constraints:**
 - `ShouldConstrainToRootBounds="False"` is required for `FlyoutBase.SystemBackdrop` to work
-- `AcrylicBrush.BackgroundSource` does not exist in WinUI 3 — use `FlyoutBase.SystemBackdrop = DesktopAcrylicBackdrop` and `AcrylicBrush` as tint only
+- No `AcrylicBrush.BackgroundSource` in WinUI 3 — use `FlyoutBase.SystemBackdrop = DesktopAcrylicBackdrop` and `AcrylicBrush` as tint only
 
-**Hit-test expansion:** Widgets use outer `Grid` (`Margin="0,-3,0,0"`) for hit area + inner `Border` (`Margin="0,3,0,0"`) for visual positioning. Do not use negative right margins on StackPanel items — this collapses the Auto-width column and shifts the layout.
+**Hit-test expansion:** Widgets use outer `Grid` (`Margin="0,-3,0,0"`) for hit area + inner `Border` (`Margin="0,3,0,0"`) for visual positioning. Do not use negative right margins on StackPanel items.
 
-**Fullscreen auto-hide:** `IsWindowFullscreen` compares `GetWindowRect` to `GetMonitorInfo.rcMonitor` (full monitor bounds, not work area) on the same monitor as the bar. Truly fullscreen windows (like YouTube/F11) are distinguished from "just maximized" windows by their lack of a window caption (`WS_CAPTION`). Shell windows (`Progman`, `WorkerW`, `Shell_TrayWnd`, `Shell_SecondaryTrayWnd`) are excluded. `HideBarForFullscreen`: `ABM_REMOVE` + `ShowWindow(SW_HIDE)`. `ShowBarAfterFullscreen`: `ShowWindow(SW_SHOWNA)` + `RegisterOrUpdateAppBar`. State tracked in `_isFullscreenActive`. Triggered from `OnForegroundEvent` (instant) and the 1s clock timer (catches in-place fullscreen like browser video). `TaskbarCreated` in `NewWindowProc` skips re-registration when `_isFullscreenActive` is true.
+**Fullscreen auto-hide:** `IsWindowFullscreen` compares `GetWindowRect` to `GetMonitorInfo.rcMonitor` on the same monitor as the bar. Fullscreen is distinguished from maximized by absence of `WS_CAPTION`. Shell windows and cloaked windows are excluded. State tracked in `_isFullscreenActive`.
 
-**Battery / energy saver:** `EnergySaverOn` = `SystemStatusFlag == 1` OR `PowerGetEffectiveOverlayScheme` returns `961cc777-...` (Power Saver overlay). Do NOT use `Windows.System.Power.PowerManager.EnergySaverStatus` — throws in unpackaged apps. Use `ChargeRateInMilliwatts > 0` for charging detection; do not use `BatteryFlag & 8` alone (Lenovo misreports it).
+**Battery / energy saver:** Do NOT use `Windows.System.Power.PowerManager.EnergySaverStatus` — throws in unpackaged apps. Use `ChargeRateInMilliwatts > 0` for charging; do not use `BatteryFlag & 8` alone (Lenovo misreports it).
 
-**Battery flyout settings:** `battery_show_progress_bar` toggles the `ProgressBar` in the flyout (bound via `ViewModel.BatteryFlyoutProgressVisibility`). `battery_show_usage_time` toggles the "usage since full charge" row (computed by `BatteryUsageTracker`, persisted in `usage_tracker.json`). Both default `true`. The usage tracker bootstraps `AnchorMWh` from `fullMWh` on first discharge if no full-charge event has ever been recorded (handles battery conservation / threshold charging modes).
+**Battery flyout:** `battery_show_progress_bar` and `battery_show_usage_time` both default `true`. Usage tracker (`BatteryUsageTracker`) persists to `usage_tracker.json`; bootstraps anchor from `fullMWh` on first discharge if no full-charge event recorded.
 
-**Virtual desktop:** `EVENT_SYSTEM_DESKTOPSWITCH` fires before Windows updates `CurrentVirtualDesktop` in the registry. `OnDesktopSwitchEvent` posts a 50ms deferred `UpdateVirtualDesktop()` call (via `DispatcherQueue` + `Task.Delay`) to let the OS finish the switch. The 1s clock timer backs this up. Do not call `UpdateVirtualDesktop()` synchronously in the event — it will read stale data.
+**Virtual desktop:** `EVENT_SYSTEM_DESKTOPSWITCH` fires before the registry is updated. `OnDesktopSwitchEvent` defers `UpdateVirtualDesktop()` by 50ms. Do not call it synchronously in the event.
 
-**Clock / Notification Center:** `ClockHost_Tapped` sends `Win+N`. Skip if `_lastExternalForegroundHwnd` process is `ShellExperienceHost` (notification center already open). Do not use `FindWindow("Shell_NotificationCenter", ...)`.
+**Clock / Notification Center:** `ClockHost_Tapped` sends `Win+N`. Skip if `_lastExternalForegroundHwnd` process is `ShellExperienceHost`.
 
-**Threading:** All UI Automation (`UiaMenuService`) and VirtualDesktopService COM calls run on background MTA threads to prevent UI hangs.
+**Threading:** `UiaMenuService` and `VirtualDesktopService` COM calls run on background MTA threads. All UI updates must be dispatched via `DispatcherQueue`.
+
+**Font size scaling:** `IconFontSize = barHeight * 0.62`, `TextFontSize = barHeight * 0.46`, unless overridden by `font_size_icon` / `font_size_text` in settings. `BatteryTextMargin` uses a negative top margin (not positive bottom) to avoid inflating measured height.
+
+**Exception safety — native callbacks:** `NewWindowProc`, `OnForegroundEvent`, `OnTitleChangeEvent`, `OnDesktopSwitchEvent` are native callbacks. Exceptions escaping them cross the managed/native boundary and are immediately fatal. All must keep their top-level `try { } catch { }`.
+
+**Exception safety — `async void`:** `async void` bypasses `UnhandledException` — unhandled exceptions go directly to the sync context and crash. Every `async void` method (e.g. `RefreshAppMenu`) must have a top-level `try { } catch { }`.
+
+**Exception safety — global handler:** `App.xaml.cs` registers `UnhandledException` (`e.Handled = true`) and `TaskScheduler.UnobservedTaskException` (`e.SetObserved()`). Do not remove these.
+
+**MediaService shutdown order:** `Dispose()` stops `_progressTimer` first, then sets `StateChanged = null`, then calls `AttachSession(null)`. This order prevents post-close UI callbacks.
 
 ## Key Constraints
 
@@ -72,4 +82,3 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 1. **Plan:** Break into explicit phases before writing any code.
 2. **Build after each phase:** `dotnet build MenuBar.csproj`. Fix all errors before proceeding.
 3. **Finalize:** Always publish to the `publish/` folder after every completed change — use the `dotnet publish` command from Build & Run above.
-

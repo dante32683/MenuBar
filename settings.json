@@ -1,6 +1,6 @@
 {
   "_help": {
-    "bar_height":         "Bar height in pixels. Range: 26–56. Font sizes scale automatically unless overridden.",
+    "bar_height":         "Bar height in pixels. Range: 24–56. Font sizes scale automatically unless overridden.",
     "show_battery":       "Show the battery icon and percentage. Set false to hide on desktop PCs.",
     "show_network":       "Show the Wi-Fi / Ethernet icon.",
     "show_clock":         "Show the clock / date widget.",
@@ -53,5 +53,6 @@
   "media_show_shuffle_button": true,
   "media_show_loop_button": true,
   "battery_show_progress_bar": true,
-  "battery_show_usage_time": true
+  "battery_show_usage_time": true,
+  "show_phone": false
 }
