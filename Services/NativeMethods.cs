@@ -117,6 +117,9 @@ namespace MenuBar.Services
         [Guid("aa509086-5ca9-4c25-8f95-589d3c07b48a")]
         public class VirtualDesktopManager { }
 
+        // ShowWindow commands
+        public const int SW_RESTORE = 9;
+
         // Messages
         public const int WM_GETICON = 0x007F;
         public const int ICON_SMALL = 0;
@@ -356,6 +359,10 @@ namespace MenuBar.Services
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]

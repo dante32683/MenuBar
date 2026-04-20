@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
@@ -30,6 +33,8 @@ namespace MenuBar
         private readonly BatteryUsageTracker _batteryUsageTracker = new BatteryUsageTracker();
         private string _batteryUsageTimeText;
         private string _phoneCommand = "";
+        private CancellationTokenSource _phoneWaitCts;
+        private Brush _phoneActiveBrush;
 
         private readonly Brush _mediaPlayingBrush;
         private readonly Brush _mediaPausedBrush;
@@ -107,6 +112,7 @@ namespace MenuBar
             _pillNormalBrush = GetThemeBrush("SubtleFillColorSecondaryBrush", Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255));
             _batteryDefaultBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
             _batteryChargingBrush = GetThemeBrush("SystemFillColorSuccessBrush", Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F));
+            _phoneActiveBrush = _batteryChargingBrush;
             _batteryPluggedBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
             _batterySaverBrush = GetThemeBrush("SystemFillColorCautionBrush", Microsoft.UI.ColorHelper.FromArgb(255, 0xFC, 0xE1, 0x00));
             _hwnd = WindowNative.GetWindowHandle(this);
@@ -270,6 +276,7 @@ namespace MenuBar
                 UpdateClock();
                 UpdateVirtualDesktop();
                 CheckAndApplyFullscreenState(NativeMethods.GetForegroundWindow());
+                if (_settings.ShowPhone) UpdatePhoneStatus();
             };
             _clockTimer.Start();
 
@@ -1450,19 +1457,111 @@ namespace MenuBar
             }
         }
 
+        private void UpdatePhoneStatus()
+        {
+            bool active = Process.GetProcessesByName("scrcpy").Length > 0;
+            PhoneIcon.Foreground = active ? _phoneActiveBrush : _batteryDefaultBrush;
+        }
+
         private void PhoneHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
             try
             {
-                if (string.IsNullOrEmpty(_phoneCommand)) return;
-                var spaceIdx = _phoneCommand.IndexOf(' ');
-                var exe = spaceIdx >= 0 ? _phoneCommand.Substring(0, spaceIdx) : _phoneCommand;
-                var args = spaceIdx >= 0 ? _phoneCommand.Substring(spaceIdx + 1) : "";
-                Process.Start(new ProcessStartInfo(exe, args)
+                if (_phoneWaitCts != null) return; // spinner is showing, ignore
+
+                if (Process.GetProcessesByName("scrcpy").Length > 0)
                 {
-                    UseShellExecute = true,
-                    WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-                });
+                    ToggleAttachedFlyout(PhoneHost);
+                    return;
+                }
+
+                _ = LaunchPhoneAsync();
+            }
+            catch { }
+        }
+
+        private async Task LaunchPhoneAsync()
+        {
+            if (string.IsNullOrEmpty(_phoneCommand)) return;
+            if (_phoneWaitCts != null) return;
+
+            var existingPids = new HashSet<int>(
+                Process.GetProcessesByName("scrcpy").Select(p => p.Id));
+
+            var spaceIdx = _phoneCommand.IndexOf(' ');
+            var exe = spaceIdx >= 0 ? _phoneCommand.Substring(0, spaceIdx) : _phoneCommand;
+            var args = spaceIdx >= 0 ? _phoneCommand.Substring(spaceIdx + 1) : "";
+            Process.Start(new ProcessStartInfo(exe, args)
+            {
+                UseShellExecute = true,
+                WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            });
+
+            PhoneSpinner.Visibility = Visibility.Visible;
+            PhoneIcon.Visibility = Visibility.Collapsed;
+
+            _phoneWaitCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var token = _phoneWaitCts.Token;
+
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    while (!token.IsCancellationRequested)
+                    {
+                        var procs = Process.GetProcessesByName("scrcpy");
+                        if (procs.Any(p => !existingPids.Contains(p.Id)))
+                            break;
+                        await Task.Delay(500, token);
+                    }
+                }
+                catch (OperationCanceledException) { }
+            });
+
+            bool active = Process.GetProcessesByName("scrcpy").Length > 0;
+            PhoneIcon.Foreground = active ? _phoneActiveBrush : _batteryDefaultBrush;
+            PhoneSpinner.Visibility = Visibility.Collapsed;
+            PhoneIcon.Visibility = Visibility.Visible;
+            _phoneWaitCts.Dispose();
+            _phoneWaitCts = null;
+        }
+
+        private void PhoneBringToFront_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                foreach (var proc in Process.GetProcessesByName("scrcpy"))
+                {
+                    IntPtr hwnd = proc.MainWindowHandle;
+                    if (hwnd == IntPtr.Zero) continue;
+                    VirtualDesktopService.MoveWindowToCurrentDesktop(hwnd);
+                    NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
+                    NativeMethods.SetForegroundWindow(hwnd);
+                    break;
+                }
+            }
+            catch { }
+        }
+
+        private async void PhoneReconnect_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                foreach (var proc in Process.GetProcessesByName("scrcpy"))
+                    try { proc.Kill(); } catch { }
+
+                await Task.Delay(600);
+                await LaunchPhoneAsync();
+            }
+            catch { }
+        }
+
+        private void PhoneDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                foreach (var proc in Process.GetProcessesByName("scrcpy"))
+                    try { proc.Kill(); } catch { }
             }
             catch { }
         }

@@ -675,11 +675,36 @@
                                 Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
                                 Margin="0,3,0,0"
                                 VerticalAlignment="Stretch">
-                            <TextBlock Text="&#xF6C6;"
-                                       FontFamily="Segoe Fluent Icons"
-                                       FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                       VerticalAlignment="Center" />
+                            <FlyoutBase.AttachedFlyout>
+                                <MenuFlyout Placement="Bottom" ShouldConstrainToRootBounds="False">
+                                    <MenuFlyout.SystemBackdrop>
+                                        <media:DesktopAcrylicBackdrop />
+                                    </MenuFlyout.SystemBackdrop>
+                                    <MenuFlyout.MenuFlyoutPresenterStyle>
+                                        <StaticResource ResourceKey="MenuFlyoutChromePresenterStyle" />
+                                    </MenuFlyout.MenuFlyoutPresenterStyle>
+                                    <MenuFlyoutItem Text="Bring to front" Click="PhoneBringToFront_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Reconnect" Click="PhoneReconnect_Click" />
+                                    <MenuFlyoutItem Text="Disconnect" Click="PhoneDisconnect_Click" />
+                                </MenuFlyout>
+                            </FlyoutBase.AttachedFlyout>
+                            <Grid>
+                                <TextBlock x:Name="PhoneIcon"
+                                           Text="&#xF6C6;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center" />
+                                <ProgressRing x:Name="PhoneSpinner"
+                                              IsActive="True"
+                                              Visibility="Collapsed"
+                                              Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                              Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Center" />
+                            </Grid>
                         </Border>
                     </Grid>
 

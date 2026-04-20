@@ -58,6 +58,19 @@ namespace MenuBar.Services
             catch { return "Desktop 1"; }
         }
 
+        public static void MoveWindowToCurrentDesktop(IntPtr hwnd)
+        {
+            try
+            {
+                using var vdKey = Registry.CurrentUser.OpenSubKey(VdRoot);
+                if (vdKey?.GetValue("CurrentVirtualDesktop") is not byte[] currentBytes || currentBytes.Length < 16)
+                    return;
+                Guid currentDesktopId = new Guid(currentBytes);
+                _manager.MoveWindowToDesktop(hwnd, ref currentDesktopId);
+            }
+            catch { }
+        }
+
         private static string GetActiveDesktopLabelFromRegistry()
         {
             try
