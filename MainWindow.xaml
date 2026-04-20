@@ -698,7 +698,7 @@
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Center" />
                                 <ProgressRing x:Name="PhoneSpinner"
-                                              IsActive="True"
+                                              IsActive="False"
                                               Visibility="Collapsed"
                                               Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
                                               Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"

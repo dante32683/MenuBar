@@ -171,10 +171,15 @@ namespace MenuBar.Services
             }
         }
 
+        private DateTime _lastEventTime = DateTime.MinValue;
+        private const int EventThrottleMs = 250;
+
         private void OnMediaPropertiesChanged(
             GlobalSystemMediaTransportControlsSession sender,
             MediaPropertiesChangedEventArgs args)
         {
+            if ((DateTime.Now - _lastEventTime).TotalMilliseconds < EventThrottleMs) return;
+            _lastEventTime = DateTime.Now;
             _dispatcher.TryEnqueue(() => _ = RefreshAsync(full: true));
         }
 
@@ -182,6 +187,8 @@ namespace MenuBar.Services
             GlobalSystemMediaTransportControlsSession sender,
             PlaybackInfoChangedEventArgs args)
         {
+            if ((DateTime.Now - _lastEventTime).TotalMilliseconds < EventThrottleMs) return;
+            _lastEventTime = DateTime.Now;
             _dispatcher.TryEnqueue(() => _ = RefreshAsync(full: false));
         }
 
@@ -189,6 +196,8 @@ namespace MenuBar.Services
             GlobalSystemMediaTransportControlsSession sender,
             TimelinePropertiesChangedEventArgs args)
         {
+            if ((DateTime.Now - _lastEventTime).TotalMilliseconds < EventThrottleMs) return;
+            _lastEventTime = DateTime.Now;
             _dispatcher.TryEnqueue(() => _ = RefreshAsync(full: false));
         }
 

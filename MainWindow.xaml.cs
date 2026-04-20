@@ -287,8 +287,14 @@ namespace MenuBar
             Battery.AggregateBattery.ReportUpdated += OnBatteryReportUpdated;
         }
 
+        private DateTime _lastBatteryEventTime = DateTime.MinValue;
+
         private void OnBatteryReportUpdated(Battery sender, object args)
-            => DispatcherQueue.TryEnqueue(UpdateBattery);
+        {
+            if ((DateTime.Now - _lastBatteryEventTime).TotalSeconds < 1) return;
+            _lastBatteryEventTime = DateTime.Now;
+            DispatcherQueue.TryEnqueue(UpdateBattery);
+        }
 
         private void SetupForegroundHook()
         {
@@ -1497,6 +1503,7 @@ namespace MenuBar
                 WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
             });
 
+            PhoneSpinner.IsActive = true;
             PhoneSpinner.Visibility = Visibility.Visible;
             PhoneIcon.Visibility = Visibility.Collapsed;
 
@@ -1521,6 +1528,7 @@ namespace MenuBar
             bool active = Process.GetProcessesByName("scrcpy").Length > 0;
             PhoneIcon.Foreground = active ? _phoneActiveBrush : _batteryDefaultBrush;
             PhoneSpinner.Visibility = Visibility.Collapsed;
+            PhoneSpinner.IsActive = false;
             PhoneIcon.Visibility = Visibility.Visible;
             _phoneWaitCts.Dispose();
             _phoneWaitCts = null;
