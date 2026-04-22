@@ -47,6 +47,9 @@ namespace MenuBar.Services
         private ImageSource _cachedAlbumCover;
         private ImageSource _cachedSourceAppIcon;
 
+        // Track active sessions to ensure we switch when background apps resume playing
+        private readonly Dictionary<string, GlobalSystemMediaTransportControlsSession> _trackedSessions = new();
+
         public event Action<MediaState> StateChanged;
         public MediaState CurrentState { get; private set; } = MediaState.Empty;
         public bool SuppressUpdates { get; set; }
@@ -72,6 +75,7 @@ namespace MenuBar.Services
                 _manager.CurrentSessionChanged += OnCurrentSessionChanged;
                 _manager.SessionsChanged += OnSessionsChanged;
                 
+                UpdateTrackedSessions();
                 UpdateSessionSelection();
             }
             catch
@@ -82,6 +86,40 @@ namespace MenuBar.Services
                     StateChanged?.Invoke(CurrentState);
                 });
             }
+        }
+
+        private void UpdateTrackedSessions()
+        {
+            try
+            {
+                var currentSessions = _manager.GetSessions();
+                var currentSessionIds = currentSessions.Select(s => s.SourceAppUserModelId).ToHashSet();
+
+                var keysToRemove = _trackedSessions.Keys.Where(k => !currentSessionIds.Contains(k)).ToList();
+                foreach (var key in keysToRemove)
+                {
+                    if (_trackedSessions.TryGetValue(key, out var session))
+                    {
+                        session.PlaybackInfoChanged -= OnAnySessionPlaybackInfoChanged;
+                    }
+                    _trackedSessions.Remove(key);
+                }
+
+                foreach (var session in currentSessions)
+                {
+                    if (!_trackedSessions.ContainsKey(session.SourceAppUserModelId))
+                    {
+                        session.PlaybackInfoChanged += OnAnySessionPlaybackInfoChanged;
+                        _trackedSessions[session.SourceAppUserModelId] = session;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void OnAnySessionPlaybackInfoChanged(GlobalSystemMediaTransportControlsSession sender, PlaybackInfoChangedEventArgs args)
+        {
+            UpdateSessionSelection();
         }
 
         private GlobalSystemMediaTransportControlsSession FindBestSession()
@@ -145,6 +183,7 @@ namespace MenuBar.Services
             GlobalSystemMediaTransportControlsSessionManager sender,
             SessionsChangedEventArgs args)
         {
+            UpdateTrackedSessions();
             UpdateSessionSelection();
         }
 
@@ -236,7 +275,7 @@ namespace MenuBar.Services
                     var props = await _currentSession.TryGetMediaPropertiesAsync();
                     state.Title = props?.Title ?? string.Empty;
                     state.Artist = props?.Artist ?? string.Empty;
-                    state.SourceAppIcon = ResolveSourceAppIcon(_currentSession.SourceAppUserModelId);
+                    state.SourceAppIcon = await ResolveSourceAppIconAsync(_currentSession.SourceAppUserModelId);
 
                     string trackId = $"{state.SourceApp}:{state.Title}:{state.Artist}";
                     if (trackId != _lastTrackId)
@@ -276,16 +315,62 @@ namespace MenuBar.Services
             try { StateChanged?.Invoke(CurrentState); } catch { }
         }
 
+        private static readonly Dictionary<string, string> _appNameCache = new(StringComparer.OrdinalIgnoreCase);
+
         private static string FormatSourceApp(string aumid)
         {
             if (string.IsNullOrWhiteSpace(aumid)) return string.Empty;
+
+            if (_appNameCache.TryGetValue(aumid, out var cachedName))
+            {
+                return cachedName;
+            }
 
             try
             {
                 var appInfo = Windows.ApplicationModel.AppInfo.GetFromAppUserModelId(aumid);
                 if (appInfo != null && !string.IsNullOrWhiteSpace(appInfo.DisplayInfo.DisplayName))
                 {
+                    _appNameCache[aumid] = appInfo.DisplayInfo.DisplayName;
                     return appInfo.DisplayInfo.DisplayName;
+                }
+            }
+            catch { }
+
+            // Dynamic fallback: find a matching process and extract its file description
+            try
+            {
+                Process bestProcess = null;
+                int longestMatch = 0;
+
+                foreach (var process in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (process.MainWindowHandle == IntPtr.Zero) continue;
+
+                        string pName = process.ProcessName;
+                        if (aumid.IndexOf(pName, StringComparison.OrdinalIgnoreCase) >= 0 || 
+                            pName.IndexOf(aumid, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            if (pName.Length > longestMatch)
+                            {
+                                bestProcess = process;
+                                longestMatch = pName.Length;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (bestProcess != null)
+                {
+                    string desc = System.Diagnostics.FileVersionInfo.GetVersionInfo(bestProcess.MainModule.FileName).FileDescription;
+                    if (!string.IsNullOrWhiteSpace(desc))
+                    {
+                        _appNameCache[aumid] = desc;
+                        return desc;
+                    }
                 }
             }
             catch { }
@@ -298,17 +383,13 @@ namespace MenuBar.Services
             if (name.Length > 0 && char.IsLower(name[0]))
                 name = char.ToUpper(name[0]) + name[1..];
 
-            return name switch
-            {
-                "Spotify" => "Spotify",
-                "Chrome" => "Google Chrome",
-                "Msedge" => "Microsoft Edge",
-                "Music.UI" => "Media Player",
-                _ => name
-            };
+            if (name == "Music.UI") name = "Media Player";
+
+            _appNameCache[aumid] = name;
+            return name;
         }
 
-        private ImageSource ResolveSourceAppIcon(string aumid)
+        private async Task<ImageSource> ResolveSourceAppIconAsync(string aumid)
         {
             if (string.IsNullOrWhiteSpace(aumid))
             {
@@ -323,47 +404,45 @@ namespace MenuBar.Services
             }
 
             _lastSourceAppId = aumid;
-            _cachedSourceAppIcon = TryGetSourceAppIcon(aumid);
+            _cachedSourceAppIcon = await TryGetSourceAppIconAsync(aumid);
             return _cachedSourceAppIcon;
         }
 
-        private static ImageSource TryGetSourceAppIcon(string aumid)
+        private static async Task<ImageSource> TryGetSourceAppIconAsync(string aumid)
         {
             string processName = GetProcessNameFromAumid(aumid);
-            if (string.IsNullOrWhiteSpace(processName))
+            if (!string.IsNullOrWhiteSpace(processName))
             {
-                return null;
-            }
-
-            try
-            {
-                foreach (var process in Process.GetProcessesByName(processName))
+                try
                 {
-                    try
+                    foreach (var process in Process.GetProcessesByName(processName))
                     {
-                        IntPtr hwnd = process.MainWindowHandle;
-                        if (hwnd == IntPtr.Zero)
+                        try
                         {
-                            continue;
-                        }
+                            IntPtr hwnd = process.MainWindowHandle;
+                            if (hwnd == IntPtr.Zero)
+                            {
+                                continue;
+                            }
 
-                        ImageSource icon = GetWindowIconBitmap(hwnd);
-                        if (icon != null)
-                        {
-                            return icon;
+                            ImageSource icon = GetWindowIconBitmap(hwnd);
+                            if (icon != null)
+                            {
+                                return icon;
+                            }
                         }
-                    }
-                    catch
-                    {
-                    }
-                    finally
-                    {
-                        process.Dispose();
+                        catch
+                        {
+                        }
+                        finally
+                        {
+                            process.Dispose();
+                        }
                     }
                 }
-            }
-            catch
-            {
+                catch
+                {
+                }
             }
 
             return null;
@@ -371,10 +450,39 @@ namespace MenuBar.Services
 
         private static string GetProcessNameFromAumid(string aumid)
         {
-            if (string.IsNullOrWhiteSpace(aumid))
+            if (string.IsNullOrWhiteSpace(aumid)) return string.Empty;
+
+            try
             {
-                return string.Empty;
+                Process bestProcess = null;
+                int longestMatch = 0;
+
+                foreach (var process in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (process.MainWindowHandle == IntPtr.Zero) continue;
+
+                        string pName = process.ProcessName;
+                        if (aumid.IndexOf(pName, StringComparison.OrdinalIgnoreCase) >= 0 || 
+                            pName.IndexOf(aumid, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            if (pName.Length > longestMatch)
+                            {
+                                bestProcess = process;
+                                longestMatch = pName.Length;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (bestProcess != null)
+                {
+                    return bestProcess.ProcessName;
+                }
             }
+            catch { }
 
             string token = aumid;
             if (token.Contains('!'))
@@ -388,8 +496,7 @@ namespace MenuBar.Services
                 token = token[..(exeIndex + 4)];
             }
 
-            string fileName = Path.GetFileNameWithoutExtension(token);
-            return fileName;
+            return Path.GetFileNameWithoutExtension(token);
         }
 
         private static ImageSource GetWindowIconBitmap(IntPtr hwnd)
@@ -581,6 +688,13 @@ namespace MenuBar.Services
             // Clear subscribers before detaching the session so no post-close UI callbacks occur.
             StateChanged = null;
             AttachSession(null);
+            
+            foreach (var session in _trackedSessions.Values)
+            {
+                session.PlaybackInfoChanged -= OnAnySessionPlaybackInfoChanged;
+            }
+            _trackedSessions.Clear();
+
             if (_manager != null)
             {
                 _manager.CurrentSessionChanged -= OnCurrentSessionChanged;

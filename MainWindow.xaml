@@ -462,8 +462,8 @@
                                                         Visibility="{x:Bind ViewModel.MediaInlineSourceVisibility, Mode=OneWay}">
                                                 <Image Source="{x:Bind ViewModel.MediaSourceAppIcon, Mode=OneWay}"
                                                        Visibility="{x:Bind ViewModel.MediaSourceAppIconVisibility, Mode=OneWay}"
-                                                       Width="14"
-                                                       Height="14"
+                                                       Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                                       Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
                                                        VerticalAlignment="Center" />
                                                 <TextBlock Text="{x:Bind ViewModel.MediaSourceApp, Mode=OneWay}"
                                                            FontFamily="Segoe UI Variable, Segoe UI"
@@ -528,8 +528,8 @@
                                                                 Visibility="{x:Bind ViewModel.MediaStandardSourceVisibility, Mode=OneWay}">
                                                         <Image Source="{x:Bind ViewModel.MediaSourceAppIcon, Mode=OneWay}"
                                                                Visibility="{x:Bind ViewModel.MediaSourceAppIconVisibility, Mode=OneWay}"
-                                                               Width="14"
-                                                               Height="14"
+                                                               Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                                               Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
                                                                VerticalAlignment="Center" />
                                                         <TextBlock Text="{x:Bind ViewModel.MediaSourceApp, Mode=OneWay}"
                                                                    FontFamily="Segoe UI Variable, Segoe UI"
@@ -648,11 +648,6 @@
                         </FlyoutBase.AttachedFlyout>
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
-                            <Image Source="{x:Bind ViewModel.MediaSourceAppIcon, Mode=OneWay}"
-                                   Visibility="{x:Bind ViewModel.MediaSourceAppIconVisibility, Mode=OneWay}"
-                                   Width="14"
-                                   Height="14"
-                                   VerticalAlignment="Center" />
                             <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}"
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"

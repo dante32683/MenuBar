@@ -21,7 +21,7 @@ dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -o publish -
 Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registered via `SHAppBarMessage` using `DisplayArea.OuterBounds` for per-monitor docking. Win32 subclassing (`SetWindowSubclass`) handles `WM_DPICHANGED`, `WM_DISPLAYCHANGE`, and `TaskbarCreated`.
 
 **Services:**
-- `MediaService` — SMTC session API (no keyboard simulation)
+- `MediaService` — SMTC session API (no keyboard simulation). Subscribes to `PlaybackInfoChanged` for ALL sessions to enable seamless background-to-foreground app switching. Uses dynamic process scanning + `FileDescription` extraction for app names/icons with a static cache (`_appNameCache`) to maintain 0% CPU overhead.
 - `HardwareService` — Battery + Network
 - `VirtualDesktopService` — Hybrid COM/Registry for desktop names/ordinals
 - `UiaMenuService` — App menu extraction via UI Automation; runs on a background MTA thread
@@ -33,12 +33,15 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 - Virtual desktop: `EVENT_SYSTEM_DESKTOPSWITCH` + 1s clock timer
 - Volume scroll: `PointerWheelChanged` on RootGrid; cumulative delta threshold (120 units) → `keybd_event`
 - Clock / virtual desktop / fullscreen check: `DispatcherTimer` every 1s
-- Battery: `Battery.AggregateBattery.ReportUpdated` + `DispatcherTimer` every 10s
-- Media: `MediaService` event subscriptions; 100ms high-frequency updates while flyout is open
+- Battery: `Battery.AggregateBattery.ReportUpdated` + `DispatcherTimer` every 10s. `OnBatteryReportUpdated` is throttled to 1s.
+- Media: `MediaService` event subscriptions; 100ms high-frequency updates while flyout is open. Throttling is disabled to ensure smooth UI progression.
+- Phone Reconnect: `PhoneSpinner` (ProgressRing) must have `IsActive="False"` when `Visibility="Collapsed"` to prevent 0.5ms system timer interrupts.
 
 ## Key Patterns & Gotchas
 
-**Flyout attachment:** Flyouts attach to the **inner `Border`** (`XxxHost`), not the outer wrapper `Grid`. Always call `ToggleAttachedFlyout(GetHostBorder(sender))`.
+**Battery / performance optimization:**
+- WinUI 3 `ProgressRing` keeps the render loop alive at 0.5ms resolution if `IsActive="True"`, even if collapsed. Toggle it off when hidden.
+- SMTC events can fire hundreds of times a minute; use the `_appNameCache` in `MediaService` to avoid redundant process scanning.
 
 **Flyout constraints:**
 - `ShouldConstrainToRootBounds="False"` is required for `FlyoutBase.SystemBackdrop` to work
