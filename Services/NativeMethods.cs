@@ -40,6 +40,7 @@ namespace MenuBar.Services
         // Keyboard
         public const int KEYEVENTF_KEYUP = 0x0002;
         public const byte VK_LWIN = 0x5B;
+        public const byte VK_A = 0x41;
         public const byte VK_N = 0x4E;
         public const byte VK_VOLUME_MUTE = 0xAD;
         public const byte VK_VOLUME_DOWN = 0xAE;

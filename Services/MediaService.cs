@@ -285,7 +285,7 @@ namespace MenuBar.Services
                         {
                             try
                             {
-                                var stream = await props.Thumbnail.OpenReadAsync();
+                                using var stream = await props.Thumbnail.OpenReadAsync();
                                 if (stream != null)
                                 {
                                     var bitmap = new BitmapImage();

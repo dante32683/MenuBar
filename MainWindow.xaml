@@ -9,8 +9,56 @@
     Title="MenuBar">
 
     <!-- Dark theme keeps flyouts and text consistent with the bar styling. -->
-    <Grid x:Name="RootGrid" Background="Transparent" RequestedTheme="Dark" PointerWheelChanged="RootGrid_PointerWheelChanged">
+    <Grid x:Name="RootGrid" Background="Transparent" RequestedTheme="Dark"
+          PointerWheelChanged="RootGrid_PointerWheelChanged">
         <Grid.Resources>
+            <Style x:Key="BarToolTipStyle" TargetType="ToolTip">
+                <Setter Property="RequestedTheme" Value="Dark" />
+                <Setter Property="Background" Value="{ThemeResource SystemFillColorSolidNeutralBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorSecondaryBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="8,4,8,4" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToolTip">
+                            <Border x:Name="ToolTipRoot"
+                                    Opacity="0"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}">
+                                <Border.Shadow>
+                                    <ThemeShadow />
+                                </Border.Shadow>
+                                <ContentPresenter />
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="ToolTipStates">
+                                        <VisualState x:Name="Closed" />
+                                        <VisualState x:Name="Opened">
+                                            <Storyboard>
+                                                <!-- Win11-like subtle fade-in -->
+                                                <DoubleAnimation Storyboard.TargetName="ToolTipRoot"
+                                                                 Storyboard.TargetProperty="Opacity"
+                                                                 To="1"
+                                                                 Duration="0:0:0.12"
+                                                                 BeginTime="0:0:0.08" />
+                                            </Storyboard>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="BarToolTipTextStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontWeight" Value="Normal" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+                <Setter Property="TextWrapping" Value="WrapWholeWords" />
+            </Style>
             <Style x:Key="BarTextBlockStyle" TargetType="TextBlock">
                 <!-- Set this per TextBlock; applying FontFamily on container panels breaks the WinUI XAML compiler. -->
                 <Setter Property="FontFamily" Value="Segoe UI Variable" />
@@ -292,11 +340,9 @@
                           TintOpacity="0.85"
                           TintLuminosityOpacity="0.9"
                           FallbackColor="#2C2C2C" />
-        </Grid.Resources>
 
-        <Grid.ContextFlyout>
-            <!-- SystemBackdrop only applies here because ShouldConstrainToRootBounds is false. -->
-            <MenuFlyout ShouldConstrainToRootBounds="False">
+            <!-- Root context menu (shown manually from code; not auto-attached). -->
+            <MenuFlyout x:Key="RootContextFlyout" ShouldConstrainToRootBounds="False">
                 <MenuFlyout.SystemBackdrop>
                     <media:DesktopAcrylicBackdrop />
                 </MenuFlyout.SystemBackdrop>
@@ -309,7 +355,7 @@
                 <MenuFlyoutItem Text="Restart bar" Click="RestartBar_Click" />
                 <MenuFlyoutItem Text="Stop bar" Click="StopBar_Click" />
             </MenuFlyout>
-        </Grid.ContextFlyout>
+        </Grid.Resources>
 
         <Border x:Name="BackgroundBorder">
             <Grid x:Name="MainContentGrid" Padding="12,3" VerticalAlignment="Stretch">
@@ -371,6 +417,56 @@
                                 <Rectangle Fill="White" Grid.Row="1" Grid.Column="1" Margin="1,1,0,0" />
                             </Grid>
                         </Border>
+                        <ToolTipService.ToolTip>
+                            <ToolTip Style="{StaticResource BarToolTipStyle}">
+                                <ToolTip.Content>
+                                    <TextBlock Text="{x:Bind ViewModel.LogoTooltip, Mode=OneWay}"
+                                               Style="{StaticResource BarToolTipTextStyle}" />
+                                </ToolTip.Content>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
+                    </Grid>
+
+                    <!-- 20-20-20 eye break dots (IPC-driven) -->
+                    <Grid x:Name="EyeBreakHost"
+                          Width="{x:Bind ViewModel.EyeBreakHostWidth, Mode=OneWay}"
+                          Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                          Margin="{x:Bind ViewModel.EyeBreakMargin, Mode=OneWay}"
+                          VerticalAlignment="Center"
+                          Visibility="{x:Bind ViewModel.EyeBreakVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          ContextFlyout="{x:Null}"
+                          PointerPressed="EyeBreakHost_PointerPressed">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="{x:Bind ViewModel.EyeBreakGap, Mode=OneWay}"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Margin="0"
+                                    Opacity="{x:Bind ViewModel.EyeBreakOpacity, Mode=OneWay}">
+                            <Ellipse Width="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Height="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Fill="{x:Bind ViewModel.EyeBreakDotBrush, Mode=OneWay}" />
+                            <Ellipse Width="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Height="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Visibility="{x:Bind ViewModel.EyeBreakDot2Visibility, Mode=OneWay}"
+                                     Fill="{x:Bind ViewModel.EyeBreakDotBrush, Mode=OneWay}" />
+                            <Ellipse Width="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Height="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Visibility="{x:Bind ViewModel.EyeBreakDot3Visibility, Mode=OneWay}"
+                                     Fill="{x:Bind ViewModel.EyeBreakDotBrush, Mode=OneWay}" />
+                            <Ellipse Width="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Height="{x:Bind ViewModel.EyeBreakDotSize, Mode=OneWay}"
+                                     Visibility="{x:Bind ViewModel.EyeBreakDot4Visibility, Mode=OneWay}"
+                                     Fill="{x:Bind ViewModel.EyeBreakDotBrush, Mode=OneWay}" />
+                        </StackPanel>
+                        <ToolTipService.ToolTip>
+                            <ToolTip Style="{StaticResource BarToolTipStyle}">
+                                <ToolTip.Content>
+                                    <TextBlock Text="{x:Bind ViewModel.EyeBreakTooltip, Mode=OneWay}"
+                                               Style="{StaticResource BarToolTipTextStyle}" />
+                                </ToolTip.Content>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
                     </Grid>
 
                     <Image Source="{x:Bind ViewModel.ActiveWindowIcon, Mode=OneWay}"
@@ -389,7 +485,16 @@
                                MaxWidth="340"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
-                               Margin="4,0,0,0" />
+                               Margin="4,0,0,0">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Style="{StaticResource BarToolTipStyle}">
+                                <ToolTip.Content>
+                                    <TextBlock Text="{x:Bind ViewModel.ActiveWindowTitleTooltip, Mode=OneWay}"
+                                               Style="{StaticResource BarToolTipTextStyle}" />
+                                </ToolTip.Content>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
+                    </TextBlock>
 
                     <!-- App menu items are added here dynamically by RefreshAppMenu() -->
                     <StackPanel x:Name="AppMenuPanel"
@@ -657,55 +762,47 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+                    <ToolTipService.ToolTip>
+                        <ToolTip Style="{StaticResource BarToolTipStyle}">
+                            <ToolTip.Content>
+                                <TextBlock Text="{x:Bind ViewModel.MediaTooltip, Mode=OneWay}"
+                                           Style="{StaticResource BarToolTipTextStyle}" />
+                            </ToolTip.Content>
+                        </ToolTip>
+                    </ToolTipService.ToolTip>
                     </Grid>
 
                     <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
-                    <Grid Visibility="{x:Bind ViewModel.PhoneVisibility, Mode=OneWay}"
-                          Background="Transparent"
+                    <Grid Background="Transparent"
                           VerticalAlignment="Stretch"
                           Margin="0,-3,0,0"
                           PointerEntered="Host_PointerEntered"
                           PointerExited="Host_PointerExited"
                           PointerPressed="Host_PointerPressed"
                           PointerReleased="Host_PointerReleased"
-                          Tapped="PhoneHost_Tapped">
-                        <Border x:Name="PhoneHost"
+                          Tapped="QuickSettingsHost_Tapped">
+                        <Border x:Name="QuickSettingsHost"
                                 Background="Transparent"
                                 CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
                                 Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
                                 Margin="0,3,0,0"
-                                VerticalAlignment="Stretch">
-                            <FlyoutBase.AttachedFlyout>
-                                <MenuFlyout Placement="Bottom" ShouldConstrainToRootBounds="False">
-                                    <MenuFlyout.SystemBackdrop>
-                                        <media:DesktopAcrylicBackdrop />
-                                    </MenuFlyout.SystemBackdrop>
-                                    <MenuFlyout.MenuFlyoutPresenterStyle>
-                                        <StaticResource ResourceKey="MenuFlyoutChromePresenterStyle" />
-                                    </MenuFlyout.MenuFlyoutPresenterStyle>
-                                    <MenuFlyoutItem Text="Bring to front" Click="PhoneBringToFront_Click" />
-                                    <MenuFlyoutSeparator />
-                                    <MenuFlyoutItem Text="Reconnect" Click="PhoneReconnect_Click" />
-                                    <MenuFlyoutItem Text="Disconnect" Click="PhoneDisconnect_Click" />
-                                </MenuFlyout>
-                            </FlyoutBase.AttachedFlyout>
-                            <Grid>
-                                <TextBlock x:Name="PhoneIcon"
-                                           Text="&#xF6C6;"
-                                           FontFamily="Segoe Fluent Icons"
-                                           FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Center" />
-                                <ProgressRing x:Name="PhoneSpinner"
-                                              IsActive="False"
-                                              Visibility="Collapsed"
-                                              Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                              Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Center" />
-                            </Grid>
+                                VerticalAlignment="Stretch"
+                                MinWidth="{x:Bind ViewModel.QuickSettingsHostMinWidth, Mode=OneWay}">
+                            <TextBlock Text="&#xE70D;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
                         </Border>
+                        <ToolTipService.ToolTip>
+                            <ToolTip Style="{StaticResource BarToolTipStyle}">
+                                <ToolTip.Content>
+                                    <TextBlock Text="{x:Bind ViewModel.QuickSettingsTooltip, Mode=OneWay}"
+                                               Style="{StaticResource BarToolTipTextStyle}" />
+                                </ToolTip.Content>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
                     </Grid>
 
                     <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
@@ -799,6 +896,14 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+                    <ToolTipService.ToolTip>
+                        <ToolTip Style="{StaticResource BarToolTipStyle}">
+                            <ToolTip.Content>
+                                <TextBlock Text="{x:Bind ViewModel.NetworkTooltip, Mode=OneWay}"
+                                           Style="{StaticResource BarToolTipTextStyle}" />
+                            </ToolTip.Content>
+                        </ToolTip>
+                    </ToolTipService.ToolTip>
                     </Grid>
 
                     <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
@@ -955,6 +1060,14 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
+                    <ToolTipService.ToolTip>
+                        <ToolTip Style="{StaticResource BarToolTipStyle}">
+                            <ToolTip.Content>
+                                <TextBlock Text="{x:Bind ViewModel.BatteryTooltip, Mode=OneWay}"
+                                           Style="{StaticResource BarToolTipTextStyle}" />
+                            </ToolTip.Content>
+                        </ToolTip>
+                    </ToolTipService.ToolTip>
                     </Grid>
 
                     <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
@@ -979,6 +1092,14 @@
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                        VerticalAlignment="Center" />
                         </Border>
+                        <ToolTipService.ToolTip>
+                            <ToolTip Style="{StaticResource BarToolTipStyle}">
+                                <ToolTip.Content>
+                                    <TextBlock Text="{x:Bind ViewModel.ClockTooltip, Mode=OneWay}"
+                                               Style="{StaticResource BarToolTipTextStyle}" />
+                                </ToolTip.Content>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
                     </Grid>
                 </StackPanel>
 
@@ -1005,6 +1126,14 @@
                                FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                VerticalAlignment="Center" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Style="{StaticResource BarToolTipStyle}">
+                            <ToolTip.Content>
+                                <TextBlock Text="{x:Bind ViewModel.VirtualDesktopTooltip, Mode=OneWay}"
+                                           Style="{StaticResource BarToolTipTextStyle}" />
+                            </ToolTip.Content>
+                        </ToolTip>
+                    </ToolTipService.ToolTip>
                 </Border>
             </Grid>
         </Border>

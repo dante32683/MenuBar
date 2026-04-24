@@ -83,6 +83,13 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _networkTooltip, value);
         }
 
+        private string _quickSettingsTooltip = "Quick settings (Win+A)";
+        public string QuickSettingsTooltip
+        {
+            get => _quickSettingsTooltip;
+            set => SetProperty(ref _quickSettingsTooltip, value);
+        }
+
         private string _mediaText = "Nothing playing";
         public string MediaText
         {
@@ -275,6 +282,89 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _titleVisibility, value);
         }
 
+        // 20-20-20 eye break indicator (rendered by WinUI; state comes via IPC)
+        private Visibility _eyeBreakVisibility = Visibility.Collapsed;
+        public Visibility EyeBreakVisibility
+        {
+            get => _eyeBreakVisibility;
+            set => SetProperty(ref _eyeBreakVisibility, value);
+        }
+
+        private double _eyeBreakHostWidth = 0;
+        public double EyeBreakHostWidth
+        {
+            get => _eyeBreakHostWidth;
+            set => SetProperty(ref _eyeBreakHostWidth, value);
+        }
+
+        private int _eyeBreakDotCount = 1;
+        public int EyeBreakDotCount
+        {
+            get => _eyeBreakDotCount;
+            set
+            {
+                if (SetProperty(ref _eyeBreakDotCount, value))
+                {
+                    OnPropertyChanged(nameof(EyeBreakDot2Visibility));
+                    OnPropertyChanged(nameof(EyeBreakDot3Visibility));
+                    OnPropertyChanged(nameof(EyeBreakDot4Visibility));
+                }
+            }
+        }
+
+        public Visibility EyeBreakDot2Visibility => EyeBreakDotCount >= 2 ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility EyeBreakDot3Visibility => EyeBreakDotCount >= 3 ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility EyeBreakDot4Visibility => EyeBreakDotCount >= 4 ? Visibility.Visible : Visibility.Collapsed;
+
+        private double _eyeBreakDotSize = 12;
+        public double EyeBreakDotSize
+        {
+            get => _eyeBreakDotSize;
+            set => SetProperty(ref _eyeBreakDotSize, value);
+        }
+
+        private double _eyeBreakGap = 4;
+        public double EyeBreakGap
+        {
+            get => _eyeBreakGap;
+            set => SetProperty(ref _eyeBreakGap, value);
+        }
+
+        private double _eyeBreakZoneSize = 40;
+        public double EyeBreakZoneSize
+        {
+            get => _eyeBreakZoneSize;
+            set => SetProperty(ref _eyeBreakZoneSize, value);
+        }
+
+        private Thickness _eyeBreakMargin = new Thickness(0);
+        public Thickness EyeBreakMargin
+        {
+            get => _eyeBreakMargin;
+            set => SetProperty(ref _eyeBreakMargin, value);
+        }
+
+        private Brush _eyeBreakDotBrush;
+        public Brush EyeBreakDotBrush
+        {
+            get => _eyeBreakDotBrush;
+            set => SetProperty(ref _eyeBreakDotBrush, value);
+        }
+
+        private string _eyeBreakTooltip = "";
+        public string EyeBreakTooltip
+        {
+            get => _eyeBreakTooltip;
+            set => SetProperty(ref _eyeBreakTooltip, value);
+        }
+
+        private double _eyeBreakOpacity = 1.0;
+        public double EyeBreakOpacity
+        {
+            get => _eyeBreakOpacity;
+            set => SetProperty(ref _eyeBreakOpacity, value);
+        }
+
         private Visibility _mediaVisibility = Visibility.Collapsed;
         public Visibility MediaVisibility
         {
@@ -303,13 +393,6 @@ namespace MenuBar.ViewModels
             set => SetProperty(ref _clockVisibility, value);
         }
 
-        private Visibility _phoneVisibility = Visibility.Collapsed;
-        public Visibility PhoneVisibility
-        {
-            get => _phoneVisibility;
-            set => SetProperty(ref _phoneVisibility, value);
-        }
-
         private double _iconFontSize = 14;
         public double IconFontSize
         {
@@ -320,9 +403,12 @@ namespace MenuBar.ViewModels
                 {
                     OnPropertyChanged(nameof(FlyoutIconFontSize));
                     OnPropertyChanged(nameof(BatteryTextMargin));
+                    OnPropertyChanged(nameof(QuickSettingsHostMinWidth));
                 }
             }
         }
+
+        public double QuickSettingsHostMinWidth => Math.Round(IconFontSize * 1.8);
 
         // Negative top margin shifts the battery % text upward to compensate for Segoe Fluent Icons'
         // glyph sitting in the upper portion of its em square vs Segoe UI Variable's baseline.
@@ -469,6 +555,13 @@ namespace MenuBar.ViewModels
         {
             get => _virtualDesktopText;
             set => SetProperty(ref _virtualDesktopText, value);
+        }
+
+        private string _virtualDesktopTooltip = "Task view (Win+Tab)";
+        public string VirtualDesktopTooltip
+        {
+            get => _virtualDesktopTooltip;
+            set => SetProperty(ref _virtualDesktopTooltip, value);
         }
 
         private Visibility _virtualDesktopVisibility = Visibility.Collapsed;

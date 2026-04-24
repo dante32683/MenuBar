@@ -26,6 +26,8 @@
     "media_show_loop_button": "Show the loop/repeat button in the media flyout.",
     "battery_show_progress_bar": "Show a charge level progress bar in the battery flyout.",
     "battery_show_usage_time": "Show 'usage since full charge' time in the battery flyout (requires discharge history to build up)."
+    ,
+    "show_eye_break": "Show the 20-20-20 eye break dot indicator (driven by AHK via IPC)."
   },
 
   "bar_height": 28,
@@ -54,5 +56,5 @@
   "media_show_loop_button": true,
   "battery_show_progress_bar": true,
   "battery_show_usage_time": true,
-  "show_phone": false
+  "show_eye_break": true
 }

@@ -85,8 +85,8 @@ namespace MenuBar.Services
         [JsonPropertyName("battery_show_usage_time")]
         public bool BatteryShowUsageTime { get; set; } = true;
 
-        [JsonPropertyName("show_phone")]
-        public bool ShowPhone { get; set; } = false;
+        [JsonPropertyName("show_eye_break")]
+        public bool ShowEyeBreak { get; set; } = true;
 
         public static MenuBarSettings CreateDefault()
         {
@@ -139,6 +139,12 @@ namespace MenuBar.Services
             }
             catch
             {
+                try
+                {
+                    var backup = SettingsPath + ".bad-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                    File.Move(SettingsPath, backup, overwrite: true);
+                }
+                catch { }
                 Save(settings);
             }
 

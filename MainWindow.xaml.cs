@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -31,11 +32,11 @@ namespace MenuBar
         private readonly HardwareService _hwService = new HardwareService();
         private readonly MediaService _mediaService;
         private readonly BatteryUsageTracker _batteryUsageTracker = new BatteryUsageTracker();
+        private readonly EyeBreakIpcService _eyeBreakService = new EyeBreakIpcService();
+        private bool _eyeBreakExpandedLayout;
+        private DispatcherQueueTimer _eyeBreakFlashTimer;
+        private bool _eyeBreakFlashOn = true;
         private string _batteryUsageTimeText;
-        private string _phoneCommand = "";
-        private CancellationTokenSource _phoneWaitCts;
-        private Brush _phoneActiveBrush;
-
         private readonly Brush _mediaPlayingBrush;
         private readonly Brush _mediaPausedBrush;
         private readonly SolidColorBrush _mediaInactiveBrush =
@@ -112,12 +113,38 @@ namespace MenuBar
             _pillNormalBrush = GetThemeBrush("SubtleFillColorSecondaryBrush", Microsoft.UI.ColorHelper.FromArgb(0x0F, 255, 255, 255));
             _batteryDefaultBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
             _batteryChargingBrush = GetThemeBrush("SystemFillColorSuccessBrush", Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F));
-            _phoneActiveBrush = _batteryChargingBrush;
             _batteryPluggedBrush = GetThemeBrush("TextFillColorPrimaryBrush", Microsoft.UI.Colors.White);
             _batterySaverBrush = GetThemeBrush("SystemFillColorCautionBrush", Microsoft.UI.ColorHelper.FromArgb(255, 0xFC, 0xE1, 0x00));
             _hwnd = WindowNative.GetWindowHandle(this);
             _mediaService = new MediaService(DispatcherQueue);
             Closed += Window_Closed;
+
+            ViewModel.EyeBreakDotBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F));
+            // Keep spacing balanced: the window icon already has Margin="8,0,0,0".
+            // Use 4px right margin here so dot→icon ≈ 12px, matching the bar's left padding (12px).
+            ViewModel.EyeBreakMargin = new Thickness(0, 0, 4, 0);
+            ViewModel.EyeBreakOpacity = 1.0;
+
+            _eyeBreakFlashTimer = DispatcherQueue.CreateTimer();
+            _eyeBreakFlashTimer.IsRepeating = true;
+            _eyeBreakFlashTimer.Interval = TimeSpan.FromMilliseconds(400);
+            _eyeBreakFlashTimer.Tick += (_, _) =>
+            {
+                try
+                {
+                    _eyeBreakFlashOn = !_eyeBreakFlashOn;
+                    ViewModel.EyeBreakOpacity = _eyeBreakFlashOn ? 1.0 : 0.0;
+                }
+                catch { }
+            };
+
+            _eyeBreakService.SnapshotReceived += OnEyeBreakSnapshotReceived;
+            _eyeBreakService.Start();
+
+            RootGrid.AddHandler(
+                UIElement.PointerPressedEvent,
+                new PointerEventHandler(RootGrid_PointerPressed),
+                handledEventsToo: true);
 
             _taskbarCreatedMsg = NativeMethods.RegisterWindowMessage("TaskbarCreated");
             _subclassProc = NewWindowProc;
@@ -143,6 +170,161 @@ namespace MenuBar
             // Use handledEventsToo=true to catch events before/after Slider's internal logic
             MediaProgressSlider.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(MediaProgressSlider_PointerPressed), true);
             MediaProgressSlider.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(MediaProgressSlider_PointerReleased), true);
+        }
+
+        private void OnEyeBreakSnapshotReceived(EyeBreakIpcService.EyeBreakSnapshot snap)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    ApplyEyeBreakSnapshot(snap);
+                }
+                catch { }
+            });
+        }
+
+        private void ApplyEyeBreakSnapshot(EyeBreakIpcService.EyeBreakSnapshot snap)
+        {
+            if (!_settings.ShowEyeBreak)
+            {
+                ViewModel.EyeBreakVisibility = Visibility.Collapsed;
+                ViewModel.EyeBreakHostWidth = 0;
+                return;
+            }
+
+            bool enabled = snap.enabled;
+            bool visible = enabled && (snap.dot?.visible ?? false);
+            int stackCount = snap.dot?.stackCount ?? 1;
+            if (stackCount < 1) stackCount = 1;
+            if (stackCount > 4) stackCount = 4;
+
+            // Zone/dot sizing: clamp to fit the bar height reasonably.
+            double zone = Math.Clamp(snap.dot?.zonePx ?? 40, 16, 64);
+            double dot = Math.Clamp(snap.dot?.dotSizePx ?? 12, 4, 24);
+            double gap = Math.Clamp(snap.dot?.gapPx ?? 4, 0, 16);
+
+            // Reserve width so the title only shifts once for 4-dot mode and shifts back only when returning to 1 dot.
+            bool wantsExpanded = stackCount > 1 || string.Equals(snap.mode, "break", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(snap.mode, "postbreak", StringComparison.OrdinalIgnoreCase);
+            if (wantsExpanded) _eyeBreakExpandedLayout = true;
+            else if (stackCount == 1) _eyeBreakExpandedLayout = false;
+
+            // Layout rule:
+            // - 1-dot mode should be as tight as possible (avoid a bigger gap to the right than the left).
+            // - break/postbreak reserves the full 4-dot width so the title shifts once and doesn't jitter during dot drops.
+            double compactWidth = dot;
+            double expandedWidth = (dot * 4) + (gap * 3);
+            double hostWidth = _eyeBreakExpandedLayout ? expandedWidth : compactWidth;
+
+            ViewModel.EyeBreakZoneSize = zone;
+            ViewModel.EyeBreakDotSize = dot;
+            ViewModel.EyeBreakGap = gap;
+            ViewModel.EyeBreakDotCount = stackCount;
+            ViewModel.EyeBreakHostWidth = hostWidth;
+            ViewModel.EyeBreakTooltip = snap.tooltip ?? string.Empty;
+            ViewModel.EyeBreakVisibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            ViewModel.EyeBreakOpacity = 1.0;
+
+            // Color
+            string hex = snap.dot?.baseColor ?? "#6CCB5F";
+            if (TryParseHexColor(hex, out var c))
+            {
+                ViewModel.EyeBreakDotBrush = new SolidColorBrush(c);
+            }
+
+            // Flashing (visual only): use opacity so layout doesn't shift.
+            string flashKind = snap.flash?.kind ?? "none";
+            int intervalMs = snap.flash?.intervalMs ?? 0;
+            bool wantsFlash = visible
+                && string.Equals(flashKind, "toggle", StringComparison.OrdinalIgnoreCase)
+                && intervalMs > 0;
+
+            if (wantsFlash)
+            {
+                if (_eyeBreakFlashTimer.Interval.TotalMilliseconds != intervalMs)
+                {
+                    _eyeBreakFlashTimer.Interval = TimeSpan.FromMilliseconds(intervalMs);
+                }
+                if (!_eyeBreakFlashTimer.IsRunning)
+                {
+                    _eyeBreakFlashOn = true;
+                    ViewModel.EyeBreakOpacity = 1.0;
+                    _eyeBreakFlashTimer.Start();
+                }
+            }
+            else
+            {
+                if (_eyeBreakFlashTimer.IsRunning)
+                {
+                    _eyeBreakFlashTimer.Stop();
+                    _eyeBreakFlashOn = true;
+                    ViewModel.EyeBreakOpacity = 1.0;
+                }
+            }
+        }
+
+        private static bool TryParseHexColor(string hex, out Windows.UI.Color color)
+        {
+            color = Microsoft.UI.Colors.Transparent;
+            if (string.IsNullOrWhiteSpace(hex)) return false;
+
+            string s = hex.Trim();
+            if (s.StartsWith("#", StringComparison.Ordinal)) s = s[1..];
+            if (s.Length != 6) return false;
+
+            if (!byte.TryParse(s.Substring(0, 2), System.Globalization.NumberStyles.HexNumber, null, out byte r)) return false;
+            if (!byte.TryParse(s.Substring(2, 2), System.Globalization.NumberStyles.HexNumber, null, out byte g)) return false;
+            if (!byte.TryParse(s.Substring(4, 2), System.Globalization.NumberStyles.HexNumber, null, out byte b)) return false;
+            color = Microsoft.UI.ColorHelper.FromArgb(255, r, g, b);
+            return true;
+        }
+
+        private void EyeBreakHost_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            try
+            {
+                var p = e.GetCurrentPoint(EyeBreakHost);
+                EyeBreakIpcService.LogExternal(
+                    $"EyeBreakHost_PointerPressed: left={p.Properties.IsLeftButtonPressed} right={p.Properties.IsRightButtonPressed}");
+                if (p.Properties.IsRightButtonPressed)
+                {
+                    e.Handled = true;
+                    _eyeBreakService.EnqueueCommand("{\"v\":1,\"cmd\":\"startBreak\"}");
+                }
+            }
+            catch { }
+        }
+
+        private void RootGrid_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            try
+            {
+                var p = e.GetCurrentPoint(RootGrid);
+                if (!p.Properties.IsRightButtonPressed) return;
+
+                bool onDots = e.OriginalSource is DependencyObject d && IsDescendantOf(d, EyeBreakHost);
+                EyeBreakIpcService.LogExternal(
+                    $"RootGrid_PointerPressed: right-click onDots={onDots} src={e.OriginalSource?.GetType().Name}");
+
+                if (onDots) return;
+
+                if (RootGrid.Resources.TryGetValue("RootContextFlyout", out var obj) && obj is MenuFlyout mf)
+                {
+                    mf.ShowAt(RootGrid, new FlyoutShowOptions { Position = p.Position });
+                    e.Handled = true;
+                }
+            }
+            catch { }
+        }
+
+        private static bool IsDescendantOf(DependencyObject element, DependencyObject ancestor)
+        {
+            for (DependencyObject cur = element; cur != null; cur = VisualTreeHelper.GetParent(cur))
+            {
+                if (ReferenceEquals(cur, ancestor)) return true;
+            }
+            return false;
         }
 
         private IntPtr NewWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, uint uIdSubclass, IntPtr dwRefData)
@@ -276,7 +458,6 @@ namespace MenuBar
                 UpdateClock();
                 UpdateVirtualDesktop();
                 CheckAndApplyFullscreenState(NativeMethods.GetForegroundWindow());
-                if (_settings.ShowPhone) UpdatePhoneStatus();
             };
             _clockTimer.Start();
 
@@ -524,24 +705,10 @@ namespace MenuBar
 
         #region Settings
 
-        private static string LoadEnvValue(string key)
-        {
-            var envPath = Path.Combine(AppContext.BaseDirectory, ".env");
-            if (!File.Exists(envPath)) return "";
-            foreach (var line in File.ReadAllLines(envPath))
-            {
-                var trimmed = line.Trim();
-                if (trimmed.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))
-                    return trimmed.Substring(key.Length + 1);
-            }
-            return "";
-        }
-
         private void LoadSettings(bool applyLayout)
         {
             SettingsService.EnsureExists();
             _settings = SettingsService.Load();
-            _phoneCommand = LoadEnvValue("PHONE_COMMAND");
             ApplySettings();
 
             if (applyLayout)
@@ -588,7 +755,12 @@ namespace MenuBar
             ViewModel.BatteryVisibility = ToVisibility(_settings.ShowBattery);
             ViewModel.ClockVisibility = ToVisibility(_settings.ShowClock);
             ViewModel.VirtualDesktopVisibility = ToVisibility(_settings.ShowVirtualDesktop);
-            ViewModel.PhoneVisibility = ToVisibility(_settings.ShowPhone);
+
+            if (!_settings.ShowEyeBreak)
+            {
+                ViewModel.EyeBreakVisibility = Visibility.Collapsed;
+                ViewModel.EyeBreakHostWidth = 0;
+            }
             ViewModel.MediaFlyoutProgressVisibility = ToVisibility(_settings.MediaShowProgressBar);
             ViewModel.MediaShuffleVisibility = ToVisibility(_settings.MediaShowShuffleButton);
             ViewModel.MediaRepeatVisibility = ToVisibility(_settings.MediaShowLoopButton);
@@ -1387,6 +1559,17 @@ namespace MenuBar
             ToggleAttachedFlyout(GetHostBorder(sender));
         }
 
+        private void QuickSettingsHost_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            // PointerPressed is too late here; WinUI has already triggered the window activation/focus change.
+            if (IsShellExperienceHostWindow(_lastExternalForegroundHwnd))
+            {
+                _lastExternalForegroundHwnd = IntPtr.Zero;
+                return;
+            }
+            SendKeyChord(NativeMethods.VK_LWIN, NativeMethods.VK_A);
+        }
+
         private void BatteryHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
             ToggleAttachedFlyout(GetHostBorder(sender));
@@ -1461,117 +1644,6 @@ namespace MenuBar
                 // The dropdown opens in the target app's window at its original position.
                 UiaMenuService.ExpandOrInvokeMenuItem(item.UiaElement);
             }
-        }
-
-        private void UpdatePhoneStatus()
-        {
-            bool active = Process.GetProcessesByName("scrcpy").Length > 0;
-            PhoneIcon.Foreground = active ? _phoneActiveBrush : _batteryDefaultBrush;
-        }
-
-        private void PhoneHost_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            try
-            {
-                if (_phoneWaitCts != null) return; // spinner is showing, ignore
-
-                if (Process.GetProcessesByName("scrcpy").Length > 0)
-                {
-                    ToggleAttachedFlyout(PhoneHost);
-                    return;
-                }
-
-                _ = LaunchPhoneAsync();
-            }
-            catch { }
-        }
-
-        private async Task LaunchPhoneAsync()
-        {
-            if (string.IsNullOrEmpty(_phoneCommand)) return;
-            if (_phoneWaitCts != null) return;
-
-            var existingPids = new HashSet<int>(
-                Process.GetProcessesByName("scrcpy").Select(p => p.Id));
-
-            var spaceIdx = _phoneCommand.IndexOf(' ');
-            var exe = spaceIdx >= 0 ? _phoneCommand.Substring(0, spaceIdx) : _phoneCommand;
-            var args = spaceIdx >= 0 ? _phoneCommand.Substring(spaceIdx + 1) : "";
-            Process.Start(new ProcessStartInfo(exe, args)
-            {
-                UseShellExecute = true,
-                WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-            });
-
-            PhoneSpinner.IsActive = true;
-            PhoneSpinner.Visibility = Visibility.Visible;
-            PhoneIcon.Visibility = Visibility.Collapsed;
-
-            _phoneWaitCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var token = _phoneWaitCts.Token;
-
-            await Task.Run(async () =>
-            {
-                try
-                {
-                    while (!token.IsCancellationRequested)
-                    {
-                        var procs = Process.GetProcessesByName("scrcpy");
-                        if (procs.Any(p => !existingPids.Contains(p.Id)))
-                            break;
-                        await Task.Delay(500, token);
-                    }
-                }
-                catch (OperationCanceledException) { }
-            });
-
-            bool active = Process.GetProcessesByName("scrcpy").Length > 0;
-            PhoneIcon.Foreground = active ? _phoneActiveBrush : _batteryDefaultBrush;
-            PhoneSpinner.Visibility = Visibility.Collapsed;
-            PhoneSpinner.IsActive = false;
-            PhoneIcon.Visibility = Visibility.Visible;
-            _phoneWaitCts.Dispose();
-            _phoneWaitCts = null;
-        }
-
-        private void PhoneBringToFront_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("scrcpy"))
-                {
-                    IntPtr hwnd = proc.MainWindowHandle;
-                    if (hwnd == IntPtr.Zero) continue;
-                    VirtualDesktopService.MoveWindowToCurrentDesktop(hwnd);
-                    NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
-                    NativeMethods.SetForegroundWindow(hwnd);
-                    break;
-                }
-            }
-            catch { }
-        }
-
-        private async void PhoneReconnect_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("scrcpy"))
-                    try { proc.Kill(); } catch { }
-
-                await Task.Delay(600);
-                await LaunchPhoneAsync();
-            }
-            catch { }
-        }
-
-        private void PhoneDisconnect_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("scrcpy"))
-                    try { proc.Kill(); } catch { }
-            }
-            catch { }
         }
 
         private void ClockHost_Tapped(object sender, TappedRoutedEventArgs e)
@@ -1913,6 +1985,8 @@ namespace MenuBar
 
             _mediaService?.Dispose();
             _batteryUsageTracker?.Dispose();
+            _eyeBreakService?.Dispose();
+            try { _eyeBreakFlashTimer?.Stop(); } catch { }
 
             Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged -= OnNetworkStatusChanged;
             _uiSettings.ColorValuesChanged -= OnAccentColorChanged;
@@ -1926,6 +2000,11 @@ namespace MenuBar
                 };
                 NativeMethods.SHAppBarMessage(NativeMethods.ABM_REMOVE, ref abd);
                 _appBarRegistered = false;
+            }
+
+            if (_hwnd != IntPtr.Zero && _subclassProc != null)
+            {
+                try { NativeMethods.RemoveWindowSubclass(_hwnd, _subclassProc, 0); } catch { }
             }
         }
 

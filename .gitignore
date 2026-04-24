@@ -15,11 +15,9 @@ ARM64/
 *.userosscache
 *.sln.docstates
 *.vscode/
-*.sln
 
 # AI Code
 .claude/
-GEMINI.md
 
 .claudeignore
 headroom.yaml
