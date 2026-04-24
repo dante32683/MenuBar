@@ -2,14 +2,14 @@
 
 A macOS-style menu bar for Windows. Built with WinUI 3.
 
-Sits at the top of your screen and shows the active window title, app menus, media controls, network/battery info, and a clock. Click on most sections to get more details in a flyout.
+Sits at the top of your screen and shows the active window title, app menus, now-playing media text, network/battery info, and a clock. Click on most sections to get more details in a flyout.
 
 ## What's on the bar
 
 - **Windows logo** (optional) — tap to open a power menu: Settings, Sleep, Restart, Shut down
 - **Active window title & icon** — shows the foreground app's name and icon
 - **App menus** (optional) — File, Edit, etc. extracted from the active app via UI Automation or Win32
-- **Media controls** — tap to open a flyout with album art, track title/artist/source, progress slider, and shuffle/repeat/prev/play/next buttons
+- **Media** — shows now-playing text when something is playing (no custom flyout; use Windows Quick Settings / Action Center for the system media panel)
 - **Network** — tap to open a flyout with SSID, connection status, and link speed
 - **Battery** — icon changes color for charging (green), plugged-in full (white), energy saver (yellow), or low (yellow); tap to open a flyout with percentage, wattage, status, and time remaining
 - **Volume Control** — scroll up or down anywhere on the bar to change the system volume; triggers the native Windows OSD
@@ -58,7 +58,7 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 | `show_windows_logo` | `false` | Show a Windows logo with power menu on the left |
 | `show_title` | `true` | Show active window title and icon |
 | `show_app_menu` | `false` | Show the active app's menus (File, Edit, etc.) |
-| `show_media` | `true` | Show media widget with flyout controls |
+| `show_media` | `true` | Show now-playing media text when something is playing |
 | `show_network` | `true` | Show network widget with flyout |
 | `show_battery` | `true` | Show battery widget with flyout |
 | `show_virtual_desktop` | `false` | Show current virtual desktop name as a centered pill |
@@ -68,9 +68,6 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 | `show_projected_runtime` | `true` | Show battery runtime prediction in the battery flyout when enough charge-rate data is available |
 | `battery_show_progress_bar` | `true` | Show charge level progress bar in the battery flyout |
 | `battery_show_usage_time` | `true` | Show "usage since full charge" time in the battery flyout |
-| `media_show_progress_bar` | `true` | Show the seek/progress bar in the media flyout |
-| `media_show_shuffle_button` | `true` | Show the shuffle button in the media flyout |
-| `media_show_loop_button` | `true` | Show the loop/repeat button in the media flyout |
 | `clock_24h` | `false` | Use 24-hour time format |
 | `clock_show_seconds` | `false` | Show seconds in the clock |
 | `clock_show_date` | `true` | Show the date alongside the time |

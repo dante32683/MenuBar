@@ -73,15 +73,6 @@ namespace MenuBar.Services
         [JsonPropertyName("battery_show_progress_bar")]
         public bool BatteryShowProgressBar { get; set; } = true;
 
-        [JsonPropertyName("media_show_progress_bar")]
-        public bool MediaShowProgressBar { get; set; } = true;
-
-        [JsonPropertyName("media_show_shuffle_button")]
-        public bool MediaShowShuffleButton { get; set; } = true;
-
-        [JsonPropertyName("media_show_loop_button")]
-        public bool MediaShowLoopButton { get; set; } = true;
-
         [JsonPropertyName("battery_show_usage_time")]
         public bool BatteryShowUsageTime { get; set; } = true;
 

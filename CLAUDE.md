@@ -34,7 +34,7 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 - Volume scroll: `PointerWheelChanged` on RootGrid; cumulative delta threshold (120 units) → `keybd_event`
 - Clock / virtual desktop / fullscreen check: `DispatcherTimer` every 1s
 - Battery: `Battery.AggregateBattery.ReportUpdated` + `DispatcherTimer` every 10s. `OnBatteryReportUpdated` is throttled to 1s.
-- Media: `MediaService` event subscriptions; 100ms high-frequency updates while flyout is open. Throttling is disabled to ensure smooth UI progression.
+- Media: `MediaService` event subscriptions (event-driven, minimal polling). Bar shows now-playing text only; use Windows Quick Settings / Action Center (`Win+A`) for the system media panel.
 - Phone Reconnect: `PhoneSpinner` (ProgressRing) must have `IsActive="False"` when `Visibility="Collapsed"` to prevent 0.5ms system timer interrupts.
 
 ## Key Patterns & Gotchas

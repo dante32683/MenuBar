@@ -97,195 +97,6 @@
                 <GradientStop Color="#1E000000" Offset="1" />
             </LinearGradientBrush>
 
-            <Style x:Key="MediaTransportButtonStyle" TargetType="Button">
-                <Setter Property="Width" Value="32" />
-                <Setter Property="Height" Value="32" />
-                <Setter Property="Padding" Value="0" />
-                <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
-            </Style>
-
-            <Style x:Key="MediaProgressThumbStyle" TargetType="Thumb">
-                <Setter Property="Background" Value="{ThemeResource TextFillColorPrimaryBrush}" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Thumb">
-                            <Grid Width="14" Height="14">
-                                <Ellipse x:Name="SliderInnerThumb"
-                                         Width="8"
-                                         Height="8"
-                                         Fill="{TemplateBinding Background}"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Center"
-                                         RenderTransformOrigin="0.5,0.5">
-                                    <Ellipse.RenderTransform>
-                                        <CompositeTransform />
-                                    </Ellipse.RenderTransform>
-                                </Ellipse>
-                            </Grid>
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup x:Name="CommonStates">
-                                    <VisualState x:Name="Normal">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="Fill">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource TextFillColorPrimaryBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleX)">
-                                                <SplineDoubleKeyFrame KeyTime="{StaticResource ControlFastAnimationDuration}" Value="1" KeySpline="{StaticResource ControlFastOutSlowInKeySpline}" />
-                                            </DoubleAnimationUsingKeyFrames>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)">
-                                                <SplineDoubleKeyFrame KeyTime="{StaticResource ControlFastAnimationDuration}" Value="1" KeySpline="{StaticResource ControlFastOutSlowInKeySpline}" />
-                                            </DoubleAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="PointerOver">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="Fill">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleX)">
-                                                <SplineDoubleKeyFrame KeyTime="{StaticResource ControlNormalAnimationDuration}" Value="1.75" KeySpline="{StaticResource ControlFastOutSlowInKeySpline}" />
-                                            </DoubleAnimationUsingKeyFrames>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)">
-                                                <SplineDoubleKeyFrame KeyTime="{StaticResource ControlNormalAnimationDuration}" Value="1.75" KeySpline="{StaticResource ControlFastOutSlowInKeySpline}" />
-                                            </DoubleAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="Pressed">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="Fill">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorSecondaryBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleX)">
-                                                <SplineDoubleKeyFrame KeyTime="{StaticResource ControlNormalAnimationDuration}" Value="1.2" KeySpline="{StaticResource ControlFastOutSlowInKeySpline}" />
-                                            </DoubleAnimationUsingKeyFrames>
-                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)">
-                                                <SplineDoubleKeyFrame KeyTime="{StaticResource ControlNormalAnimationDuration}" Value="1.2" KeySpline="{StaticResource ControlFastOutSlowInKeySpline}" />
-                                            </DoubleAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="Disabled">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SliderInnerThumb" Storyboard.TargetProperty="Fill">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource TextFillColorDisabledBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
-            <Style x:Key="MediaProgressSliderStyle" TargetType="Slider">
-                <Setter Property="Height" Value="18" />
-                <Setter Property="Padding" Value="0" />
-                <Setter Property="Margin" Value="0" />
-                <Setter Property="Background" Value="{ThemeResource ControlAltFillColorSecondaryBrush}" />
-                <Setter Property="Foreground" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-                <Setter Property="BorderThickness" Value="0" />
-                <Setter Property="CornerRadius" Value="2" />
-                <Setter Property="UseSystemFocusVisuals" Value="False" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Slider">
-                            <Grid Margin="{TemplateBinding Padding}">
-                                <VisualStateManager.VisualStateGroups>
-                                    <VisualStateGroup x:Name="CommonStates">
-                                        <VisualState x:Name="Normal">
-                                            <Storyboard>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalThumb" Storyboard.TargetProperty="Background">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource TextFillColorPrimaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalTrackRect" Storyboard.TargetProperty="Fill">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlAltFillColorSecondaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalDecreaseRect" Storyboard.TargetProperty="Fill">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                            </Storyboard>
-                                        </VisualState>
-                                        <VisualState x:Name="PointerOver">
-                                            <Storyboard>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalThumb" Storyboard.TargetProperty="Background">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource TextFillColorPrimaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalTrackRect" Storyboard.TargetProperty="Fill">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlAltFillColorSecondaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalDecreaseRect" Storyboard.TargetProperty="Fill">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorSecondaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                            </Storyboard>
-                                        </VisualState>
-                                        <VisualState x:Name="Pressed">
-                                            <Storyboard>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalThumb" Storyboard.TargetProperty="Background">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalTrackRect" Storyboard.TargetProperty="Fill">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlAltFillColorSecondaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HorizontalDecreaseRect" Storyboard.TargetProperty="Fill">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorTertiaryBrush}" />
-                                                </ObjectAnimationUsingKeyFrames>
-                                            </Storyboard>
-                                        </VisualState>
-                                        <VisualState x:Name="Disabled" />
-                                    </VisualStateGroup>
-                                </VisualStateManager.VisualStateGroups>
-
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-
-                                <Grid x:Name="SliderContainer"
-                                      Grid.Row="0"
-                                      Background="Transparent"
-                                      MinHeight="18">
-                                    <Grid x:Name="HorizontalTemplate" MinHeight="18">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="7" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="7" />
-                                        </Grid.RowDefinitions>
-
-                                        <Rectangle x:Name="HorizontalTrackRect"
-                                                   Grid.Row="1"
-                                                   Grid.ColumnSpan="3"
-                                                   Height="3"
-                                                   Fill="{ThemeResource ControlAltFillColorSecondaryBrush}"
-                                                   RadiusX="1.5"
-                                                   RadiusY="1.5" />
-                                        <Rectangle x:Name="HorizontalDecreaseRect"
-                                                   Grid.Row="1"
-                                                   Height="3"
-                                                   Fill="{ThemeResource AccentFillColorDefaultBrush}"
-                                                   RadiusX="1.5"
-                                                   RadiusY="1.5" />
-                                        <Thumb x:Name="HorizontalThumb"
-                                               Grid.Row="0"
-                                               Grid.RowSpan="3"
-                                               Grid.Column="1"
-                                               Width="14"
-                                               Height="14"
-                                               Background="{ThemeResource TextFillColorPrimaryBrush}"
-                                               Style="{StaticResource MediaProgressThumbStyle}"
-                                               AutomationProperties.AccessibilityView="Raw" />
-                                        <Grid x:Name="VerticalTemplate" Visibility="Collapsed" />
-                                    </Grid>
-                                </Grid>
-                            </Grid>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
             <Style x:Key="MenuFlyoutChromePresenterStyle" TargetType="MenuFlyoutPresenter">
                 <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
             </Style>
@@ -294,12 +105,6 @@
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="CornerRadius" Value="{ThemeResource OverlayCornerRadius}" />
                 <Setter Property="Background" Value="{StaticResource FlyoutAcrylicBackground}" />
-            </Style>
-
-            <Style x:Key="MediaFlyoutPresenterStyle"
-                   TargetType="FlyoutPresenter"
-                   BasedOn="{StaticResource BaseFlyoutPresenterStyle}">
-                <Setter Property="MinWidth" Value="264" />
             </Style>
 
             <Style x:Key="NetworkFlyoutPresenterStyle"
@@ -505,274 +310,6 @@
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Stretch">
                     <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
-                    <Grid Visibility="{x:Bind ViewModel.MediaVisibility, Mode=OneWay}"
-                          Background="Transparent"
-                          VerticalAlignment="Stretch"
-                          Margin="0,-3,0,0"
-                          PointerEntered="Host_PointerEntered"
-                          PointerExited="Host_PointerExited"
-                          PointerPressed="Host_PointerPressed"
-                          PointerReleased="Host_PointerReleased"
-                          Tapped="MediaHost_Tapped">
-                    <Border x:Name="MediaHost"
-                            Background="Transparent"
-                            CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
-                            Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
-                            Margin="0,3,0,0"
-                            VerticalAlignment="Stretch">
-                        <FlyoutBase.AttachedFlyout>
-                            <!-- Same backdrop rule applies to all popups in this file. -->
-                            <Flyout Opened="MediaFlyout_Opened"
-                                    Closed="MediaFlyout_Closed"
-                                    Placement="Bottom"
-                                    ShouldConstrainToRootBounds="False">
-                                <Flyout.SystemBackdrop>
-                                    <media:DesktopAcrylicBackdrop />
-                                </Flyout.SystemBackdrop>
-                                <Flyout.FlyoutPresenterStyle>
-                                    <StaticResource ResourceKey="MediaFlyoutPresenterStyle" />
-                                </Flyout.FlyoutPresenterStyle>
-                                <Grid Padding="12"
-                                      MinWidth="264">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    Spacing="10">
-                                            <Border Width="{x:Bind ViewModel.MediaAlbumArtSize, Mode=OneWay}"
-                                                    Height="{x:Bind ViewModel.MediaAlbumArtSize, Mode=OneWay}"
-                                                    CornerRadius="10"
-                                                    Background="{ThemeResource ControlAltFillColorQuarternaryBrush}"
-                                                    HorizontalAlignment="Center">
-                                                <Grid>
-                                                    <Rectangle Fill="{StaticResource MediaArtFallbackBrush}" />
-                                                    <Image Source="{x:Bind ViewModel.MediaAlbumCover, Mode=OneWay}"
-                                                           Stretch="UniformToFill" />
-                                                </Grid>
-                                            </Border>
-
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="6"
-                                                        HorizontalAlignment="Center"
-                                                        Visibility="{x:Bind ViewModel.MediaInlineSourceVisibility, Mode=OneWay}">
-                                                <Image Source="{x:Bind ViewModel.MediaSourceAppIcon, Mode=OneWay}"
-                                                       Visibility="{x:Bind ViewModel.MediaSourceAppIconVisibility, Mode=OneWay}"
-                                                       Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                                       Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                                       VerticalAlignment="Center" />
-                                                <TextBlock Text="{x:Bind ViewModel.MediaSourceApp, Mode=OneWay}"
-                                                           FontFamily="Segoe UI Variable, Segoe UI"
-                                                           FontSize="{x:Bind ViewModel.FlyoutCaptionFontSize, Mode=OneWay}"
-                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           MaxWidth="120"
-                                                           TextAlignment="Center"
-                                                           VerticalAlignment="Center" />
-                                            </StackPanel>
-                                        </StackPanel>
-
-                                        <Grid Grid.Column="1"
-                                              Margin="12,0,0,0"
-                                              VerticalAlignment="Center">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                            </Grid.RowDefinitions>
-
-                                            <Grid>
-                                                <StackPanel Spacing="1"
-                                                            VerticalAlignment="Center"
-                                                            HorizontalAlignment="Center"
-                                                            Visibility="{x:Bind ViewModel.MediaInlineTransportVisibility, Mode=OneWay}">
-                                                    <TextBlock Text="{x:Bind ViewModel.MediaTitle, Mode=OneWay}"
-                                                               FontFamily="Segoe UI Variable, Segoe UI"
-                                                               FontWeight="SemiBold"
-                                                               FontSize="{x:Bind ViewModel.FlyoutBodyFontSize, Mode=OneWay}"
-                                                               Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               TextAlignment="Center"
-                                                               MaxWidth="172" />
-                                                    <TextBlock Text="{x:Bind ViewModel.MediaArtist, Mode=OneWay}"
-                                                               FontFamily="Segoe UI Variable, Segoe UI"
-                                                               FontSize="{x:Bind ViewModel.FlyoutCaptionFontSize, Mode=OneWay}"
-                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               TextAlignment="Center"
-                                                               MaxWidth="172" />
-                                                </StackPanel>
-
-                                                <StackPanel Spacing="1"
-                                                            VerticalAlignment="Center"
-                                                            Visibility="{x:Bind ViewModel.MediaStandardTransportVisibility, Mode=OneWay}">
-                                                    <TextBlock Text="{x:Bind ViewModel.MediaTitle, Mode=OneWay}"
-                                                               FontFamily="Segoe UI Variable, Segoe UI"
-                                                               FontWeight="SemiBold"
-                                                               FontSize="{x:Bind ViewModel.FlyoutBodyFontSize, Mode=OneWay}"
-                                                               Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               MaxWidth="172" />
-                                                    <TextBlock Text="{x:Bind ViewModel.MediaArtist, Mode=OneWay}"
-                                                               FontFamily="Segoe UI Variable, Segoe UI"
-                                                               FontSize="{x:Bind ViewModel.FlyoutCaptionFontSize, Mode=OneWay}"
-                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               MaxWidth="172" />
-                                                    <StackPanel Orientation="Horizontal"
-                                                                Spacing="6"
-                                                                Margin="0,3,0,0"
-                                                                Visibility="{x:Bind ViewModel.MediaStandardSourceVisibility, Mode=OneWay}">
-                                                        <Image Source="{x:Bind ViewModel.MediaSourceAppIcon, Mode=OneWay}"
-                                                               Visibility="{x:Bind ViewModel.MediaSourceAppIconVisibility, Mode=OneWay}"
-                                                               Width="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                                               Height="{x:Bind ViewModel.IconFontSize, Mode=OneWay}"
-                                                               VerticalAlignment="Center" />
-                                                        <TextBlock Text="{x:Bind ViewModel.MediaSourceApp, Mode=OneWay}"
-                                                                   FontFamily="Segoe UI Variable, Segoe UI"
-                                                                   FontSize="{x:Bind ViewModel.FlyoutCaptionFontSize, Mode=OneWay}"
-                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                                   TextTrimming="CharacterEllipsis"
-                                                                   MaxWidth="152" />
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Grid>
-
-                                            <StackPanel Grid.Row="1"
-                                                        Visibility="{x:Bind ViewModel.MediaInlineTransportVisibility, Mode=OneWay}"
-                                                        Orientation="Horizontal"
-                                                        HorizontalAlignment="Center"
-                                                        VerticalAlignment="Center"
-                                                        Spacing="8"
-                                                        Margin="0,10,0,0">
-                                                <Button Click="MediaShuffle_Click"
-                                                        Style="{StaticResource MediaTransportButtonStyle}"
-                                                        Visibility="{x:Bind ViewModel.MediaShuffleVisibility, Mode=OneWay}"
-                                                        Opacity="{x:Bind ViewModel.MediaShuffleOpacity, Mode=OneWay}">
-                                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B1;" FontSize="13" />
-                                                </Button>
-                                                <Button Click="MediaPrevious_Click"
-                                                        Style="{StaticResource MediaTransportButtonStyle}">
-                                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE892;" FontSize="16" />
-                                                </Button>
-                                                <Button Click="MediaPlayPause_Click"
-                                                        Style="{StaticResource AccentButtonStyle}"
-                                                        Width="40"
-                                                        Height="40"
-                                                        CornerRadius="10"
-                                                        Padding="0">
-                                                    <SymbolIcon Symbol="{x:Bind ViewModel.MediaPlayPauseSymbol, Mode=OneWay}" />
-                                                </Button>
-                                                <Button Click="MediaNext_Click"
-                                                        Style="{StaticResource MediaTransportButtonStyle}">
-                                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE893;" FontSize="16" />
-                                                </Button>
-                                                <Button Click="MediaRepeat_Click"
-                                                        Style="{StaticResource MediaTransportButtonStyle}"
-                                                        Visibility="{x:Bind ViewModel.MediaRepeatVisibility, Mode=OneWay}"
-                                                        Opacity="{x:Bind ViewModel.MediaRepeatOpacity, Mode=OneWay}">
-                                                    <FontIcon FontFamily="Segoe Fluent Icons"
-                                                              Glyph="{x:Bind ViewModel.MediaRepeatIcon, Mode=OneWay}"
-                                                              FontSize="13" />
-                                                </Button>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Grid>
-
-                                    <StackPanel Grid.Row="1"
-                                                Visibility="{x:Bind ViewModel.MediaStandardTransportVisibility, Mode=OneWay}"
-                                                Orientation="Horizontal"
-                                                HorizontalAlignment="Center"
-                                                Spacing="12"
-                                                Margin="0,12,0,0">
-                                        <Button Click="MediaShuffle_Click"
-                                                Style="{StaticResource MediaTransportButtonStyle}"
-                                                Visibility="{x:Bind ViewModel.MediaShuffleVisibility, Mode=OneWay}"
-                                                Opacity="{x:Bind ViewModel.MediaShuffleOpacity, Mode=OneWay}">
-                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B1;" FontSize="13" />
-                                        </Button>
-                                        <Button Click="MediaPrevious_Click"
-                                                Style="{StaticResource MediaTransportButtonStyle}">
-                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE892;" FontSize="16" />
-                                        </Button>
-                                        <Button Click="MediaPlayPause_Click"
-                                                Style="{StaticResource AccentButtonStyle}"
-                                                Width="40"
-                                                Height="40"
-                                                CornerRadius="10"
-                                                Padding="0">
-                                            <SymbolIcon Symbol="{x:Bind ViewModel.MediaPlayPauseSymbol, Mode=OneWay}" />
-                                        </Button>
-                                        <Button Click="MediaNext_Click"
-                                                Style="{StaticResource MediaTransportButtonStyle}">
-                                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE893;" FontSize="16" />
-                                        </Button>
-                                        <Button Click="MediaRepeat_Click"
-                                                Style="{StaticResource MediaTransportButtonStyle}"
-                                                Visibility="{x:Bind ViewModel.MediaRepeatVisibility, Mode=OneWay}"
-                                                Opacity="{x:Bind ViewModel.MediaRepeatOpacity, Mode=OneWay}">
-                                            <FontIcon FontFamily="Segoe Fluent Icons"
-                                                      Glyph="{x:Bind ViewModel.MediaRepeatIcon, Mode=OneWay}"
-                                                      FontSize="13" />
-                                        </Button>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="2"
-                                                Visibility="{x:Bind ViewModel.MediaFlyoutProgressVisibility, Mode=OneWay}"
-                                                Spacing="2"
-                                                Margin="0,10,0,0">
-                                        <Slider x:Name="MediaProgressSlider"
-                                                Minimum="0"
-                                                IsThumbToolTipEnabled="False"
-                                                Padding="0"
-                                                ValueChanged="MediaProgressSlider_ValueChanged"
-                                                PointerReleased="MediaProgressSlider_PointerReleased"
-                                                PointerPressed="MediaProgressSlider_PointerPressed"
-                                                Style="{StaticResource MediaProgressSliderStyle}" />
-                                        <Grid>
-                                            <TextBlock Text="{x:Bind ViewModel.MediaPositionText, Mode=OneWay}"
-                                                       FontSize="{x:Bind ViewModel.FlyoutCaptionFontSize, Mode=OneWay}"
-                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                       HorizontalAlignment="Left" />
-                                            <TextBlock Text="{x:Bind ViewModel.MediaDurationText, Mode=OneWay}"
-                                                       FontSize="{x:Bind ViewModel.FlyoutCaptionFontSize, Mode=OneWay}"
-                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                       HorizontalAlignment="Right" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Grid>
-                            </Flyout>
-                        </FlyoutBase.AttachedFlyout>
-                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
-                            <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}"
-                                       FontFamily="Segoe UI Variable, Segoe UI"
-                                       FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
-                                       MaxWidth="210"
-                                       TextTrimming="CharacterEllipsis"
-                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-                    <ToolTipService.ToolTip>
-                        <ToolTip Style="{StaticResource BarToolTipStyle}">
-                            <ToolTip.Content>
-                                <TextBlock Text="{x:Bind ViewModel.MediaTooltip, Mode=OneWay}"
-                                           Style="{StaticResource BarToolTipTextStyle}" />
-                            </ToolTip.Content>
-                        </ToolTip>
-                    </ToolTipService.ToolTip>
-                    </Grid>
-
-                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
                     <Grid Background="Transparent"
                           VerticalAlignment="Stretch"
                           Margin="0,-3,0,0"
@@ -799,6 +336,42 @@
                             <ToolTip Style="{StaticResource BarToolTipStyle}">
                                 <ToolTip.Content>
                                     <TextBlock Text="{x:Bind ViewModel.QuickSettingsTooltip, Mode=OneWay}"
+                                               Style="{StaticResource BarToolTipTextStyle}" />
+                                </ToolTip.Content>
+                            </ToolTip>
+                        </ToolTipService.ToolTip>
+                    </Grid>
+
+                    <!-- Outer Grid extends hit-test area to the absolute top of the bar (Fitts's Law). -->
+                    <Grid Visibility="{x:Bind ViewModel.MediaVisibility, Mode=OneWay}"
+                          Background="Transparent"
+                          VerticalAlignment="Stretch"
+                          Margin="0,-3,0,0"
+                          PointerEntered="Host_PointerEntered"
+                          PointerExited="Host_PointerExited"
+                          PointerPressed="Host_PointerPressed"
+                          PointerReleased="Host_PointerReleased">
+                        <Border x:Name="MediaHost"
+                                Background="Transparent"
+                                CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"
+                                Padding="{x:Bind ViewModel.HostPadding, Mode=OneWay}"
+                                Margin="0,3,0,0"
+                                VerticalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <Ellipse Width="6" Height="6" Fill="{x:Bind ViewModel.MediaIndicatorBrush, Mode=OneWay}" />
+                                <TextBlock Text="{x:Bind ViewModel.MediaText, Mode=OneWay}"
+                                           FontFamily="Segoe UI Variable, Segoe UI"
+                                           FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
+                                           MaxWidth="210"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <ToolTipService.ToolTip>
+                            <ToolTip Style="{StaticResource BarToolTipStyle}">
+                                <ToolTip.Content>
+                                    <TextBlock Text="{x:Bind ViewModel.MediaTooltip, Mode=OneWay}"
                                                Style="{StaticResource BarToolTipTextStyle}" />
                                 </ToolTip.Content>
                             </ToolTip>

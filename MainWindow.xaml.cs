@@ -92,7 +92,6 @@ namespace MenuBar
 
         private uint _taskbarCreatedMsg;
         private NativeMethods.SUBCLASSPROC _subclassProc;
-        private bool _isDraggingSlider;
         private bool _isFullscreenActive;
 
         private sealed class AppMenuItem
@@ -167,9 +166,6 @@ namespace MenuBar
             Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged += OnNetworkStatusChanged;
             _uiSettings.ColorValuesChanged += OnAccentColorChanged;
 
-            // Use handledEventsToo=true to catch events before/after Slider's internal logic
-            MediaProgressSlider.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(MediaProgressSlider_PointerPressed), true);
-            MediaProgressSlider.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(MediaProgressSlider_PointerReleased), true);
         }
 
         private void OnEyeBreakSnapshotReceived(EyeBreakIpcService.EyeBreakSnapshot snap)
@@ -761,10 +757,6 @@ namespace MenuBar
                 ViewModel.EyeBreakVisibility = Visibility.Collapsed;
                 ViewModel.EyeBreakHostWidth = 0;
             }
-            ViewModel.MediaFlyoutProgressVisibility = ToVisibility(_settings.MediaShowProgressBar);
-            ViewModel.MediaShuffleVisibility = ToVisibility(_settings.MediaShowShuffleButton);
-            ViewModel.MediaRepeatVisibility = ToVisibility(_settings.MediaShowLoopButton);
-            ViewModel.IsMediaInlineLayout = !(_settings.MediaShowShuffleButton && _settings.MediaShowLoopButton);
             AppMenuPanel.Visibility = ToVisibility(_settings.ShowAppMenu);
 
             int barHeight = _settings.GetEffectiveBarHeight();
@@ -1190,34 +1182,9 @@ namespace MenuBar
                 ViewModel.MediaIndicatorBrush = state.Playing ? _mediaPlayingBrush : _mediaPausedBrush;
                 ViewModel.MediaVisibility = Visibility.Visible;
 
-                ViewModel.MediaTitle = state.Title;
-                ViewModel.MediaArtist = state.Artist;
-                ViewModel.MediaSourceApp = string.IsNullOrWhiteSpace(state.SourceApp) ? "" : state.SourceApp;
-                ViewModel.MediaSourceAppIcon = state.SourceAppIcon;
-                ViewModel.MediaSourceAppIconVisibility = state.SourceAppIcon != null ? Visibility.Visible : Visibility.Collapsed;
-                ViewModel.MediaAlbumCover = state.AlbumCover;
-                ViewModel.MediaPlayPauseSymbol = state.Playing ? Symbol.Pause : Symbol.Play;
+                // Media flyout was removed; keep bar text/tooltip/indicator only.
 
-                ViewModel.MediaShuffleOpacity = state.IsShuffleActive == true ? 1.0 : 0.5;
-                ViewModel.MediaRepeatOpacity = state.RepeatMode == Windows.Media.MediaPlaybackAutoRepeatMode.None ? 0.5 : 1.0;
-                ViewModel.MediaRepeatIcon = state.RepeatMode == Windows.Media.MediaPlaybackAutoRepeatMode.Track ? "\uE8ED" : "\uE8EE";
-
-                if (!_isDraggingSlider)
-                {
-                    TimeSpan currentPos = state.Position;
-                    if (state.Playing)
-                    {
-                        TimeSpan elapsedSinceUpdate = DateTimeOffset.Now - state.LastUpdatedTime;
-                        currentPos += elapsedSinceUpdate;
-                        if (currentPos > state.EndTime) currentPos = state.EndTime;
-                    }
-
-                    MediaProgressSlider.Maximum = state.EndTime.TotalSeconds;
-                    MediaProgressSlider.Value = currentPos.TotalSeconds;
-                    
-                    ViewModel.MediaDurationText = FormatTimeSpan(state.EndTime);
-                    ViewModel.MediaPositionText = FormatTimeSpan(currentPos);
-                }
+                // Media flyout was removed; keep bar text/tooltip/indicator only.
             }
             else
             {
@@ -1225,19 +1192,6 @@ namespace MenuBar
                 ViewModel.MediaTooltip = string.Empty;
                 ViewModel.MediaIndicatorBrush = _mediaInactiveBrush;
                 ViewModel.MediaVisibility = Visibility.Collapsed;
-
-                ViewModel.MediaTitle = "Nothing playing";
-                ViewModel.MediaArtist = string.Empty;
-                ViewModel.MediaSourceApp = string.Empty;
-                ViewModel.MediaSourceAppIcon = null;
-                ViewModel.MediaSourceAppIconVisibility = Visibility.Collapsed;
-                ViewModel.MediaAlbumCover = null;
-                ViewModel.MediaPlayPauseSymbol = Symbol.Play;
-
-                MediaProgressSlider.Maximum = 1;
-                MediaProgressSlider.Value = 0;
-                ViewModel.MediaDurationText = "0:00";
-                ViewModel.MediaPositionText = "0:00";
             }
         }
 
@@ -1537,22 +1491,6 @@ namespace MenuBar
             ToggleAttachedFlyout(GetHostBorder(sender));
         }
 
-        private void MediaHost_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            ToggleAttachedFlyout(GetHostBorder(sender));
-        }
-
-        private void MediaFlyout_Opened(object sender, object e)
-        {
-            _mediaService.SetHighFrequencyUpdate(true);
-            _ = _mediaService.RefreshAsync(full: true);
-        }
-
-        private void MediaFlyout_Closed(object sender, object e)
-        {
-            _mediaService.SetHighFrequencyUpdate(false);
-        }
-
         private void NetworkHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
             UpdateNetworkFlyout();
@@ -1709,73 +1647,6 @@ namespace MenuBar
         private void ShutdownSystem_Click(object sender, RoutedEventArgs e)
         {
             RunBackgroundProcess("shutdown", "/s /t 0");
-        }
-
-        private void MediaPrevious_Click(object sender, RoutedEventArgs e)
-        {
-            _ = _mediaService.SendPreviousAsync();
-        }
-
-        private void MediaPlayPause_Click(object sender, RoutedEventArgs e)
-        {
-            _ = _mediaService.SendPlayPauseAsync();
-        }
-
-        private void MediaNext_Click(object sender, RoutedEventArgs e)
-        {
-            _ = _mediaService.SendNextAsync();
-        }
-
-        private void MediaShuffle_Click(object sender, RoutedEventArgs e)
-        {
-            _ = _mediaService.ToggleShuffleAsync();
-        }
-
-        private void MediaRepeat_Click(object sender, RoutedEventArgs e)
-        {
-            _ = _mediaService.ToggleRepeatAsync();
-        }
-
-        private void MediaProgressSlider_PointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            if (sender is Slider slider)
-            {
-                _isDraggingSlider = true;
-                _mediaService.SuppressUpdates = true;
-                slider.CapturePointer(e.Pointer);
-            }
-        }
-
-        private void MediaProgressSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-        {
-            if (_isDraggingSlider)
-            {
-                ViewModel.MediaPositionText = FormatTimeSpan(TimeSpan.FromSeconds(e.NewValue));
-            }
-        }
-
-        private async void MediaProgressSlider_PointerReleased(object sender, PointerRoutedEventArgs e)
-        {
-            if (sender is Slider slider)
-            {
-                slider.ReleasePointerCapture(e.Pointer);
-
-                if (_isDraggingSlider)
-                {
-                    _isDraggingSlider = false;
-                    // Keep SuppressUpdates = true while seeking
-                    await _mediaService.SeekAsync(TimeSpan.FromSeconds(slider.Value));
-                    
-                    // Keep suppression active for 1.5s after release to let OS catch up
-                    await Task.Delay(1500);
-                    _mediaService.SuppressUpdates = false;
-                    _ = _mediaService.RefreshAsync(full: false);
-                    return;
-                }
-            }
-
-            _isDraggingSlider = false;
-            _mediaService.SuppressUpdates = false;
         }
 
         private static Border GetHostBorder(object sender)

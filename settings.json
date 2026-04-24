@@ -21,9 +21,6 @@
     "enable_volume_scroll": "Enable system volume control by scrolling anywhere on the bar.",
     "volume_scroll_threshold": "Cumulative scroll delta required to change volume (120 = one standard mouse wheel click).",
     "show_projected_runtime": "Show battery runtime prediction in the battery flyout when enough charge-rate data is available.",
-    "media_show_progress_bar": "Show the seek/progress bar in the media flyout.",
-    "media_show_shuffle_button": "Show the shuffle button in the media flyout.",
-    "media_show_loop_button": "Show the loop/repeat button in the media flyout.",
     "battery_show_progress_bar": "Show a charge level progress bar in the battery flyout.",
     "battery_show_usage_time": "Show 'usage since full charge' time in the battery flyout (requires discharge history to build up)."
     ,
@@ -51,9 +48,6 @@
   "enable_volume_scroll": true,
   "volume_scroll_threshold": 120,
   "show_projected_runtime": true,
-  "media_show_progress_bar": true,
-  "media_show_shuffle_button": true,
-  "media_show_loop_button": true,
   "battery_show_progress_bar": true,
   "battery_show_usage_time": true,
   "show_eye_break": true
