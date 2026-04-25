@@ -1,55 +1,38 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo.
-
-## What This Is
-
-macOS-style menu bar for Windows (WinUI 3, .NET 8). Top-docked AppBar showing active window title, app menus, media controls, network/battery, virtual desktop, and clock. Unpackaged, no MSIX.
+macOS-style menu bar for Windows (WinUI 3, .NET 8). Unpackaged (no MSIX). Single window, top-docked AppBar.
 
 ## Build & Run
 
 ```bash
-# Debug build
 dotnet build MenuBar.csproj
 
-# Publish directly to publish/ folder
 dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -o publish --no-self-contained
 ```
 
 ## Architecture
 
-Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registered via `SHAppBarMessage` using `DisplayArea.OuterBounds` for per-monitor docking. Win32 subclassing (`SetWindowSubclass`) handles `WM_DPICHANGED`, `WM_DISPLAYCHANGE`, and `TaskbarCreated`.
+`MainWindow.xaml.cs` coordinates services + UI. AppBar docking via `SHAppBarMessage` + `DisplayArea.OuterBounds`. Win32 subclassing (`SetWindowSubclass`) handles `WM_DPICHANGED`, `WM_DISPLAYCHANGE`, `TaskbarCreated`.
 
-**Services:**
-- `MediaService` — SMTC session API (no keyboard simulation). Subscribes to `PlaybackInfoChanged` for ALL sessions to enable seamless background-to-foreground app switching. Uses dynamic process scanning + `FileDescription` extraction for app names/icons with a static cache (`_appNameCache`) to maintain 0% CPU overhead.
-- `HardwareService` — Battery + Network
-- `VirtualDesktopService` — Hybrid COM/Registry for desktop names/ordinals
-- `UiaMenuService` — App menu extraction via UI Automation; runs on a background MTA thread
-- `NativeMethods` — All Win32 P/Invoke
-- `SettingsService` — `settings.json` with hot-reload via context menu
+**Core services (high level):** `MediaService`, `HardwareService`, `VirtualDesktopService`, `UiaMenuService`, `SettingsService`, `NativeMethods`.
 
-**Event sources (event-driven, minimal polling):**
-- Active window title: `EVENT_SYSTEM_FOREGROUND` + `EVENT_OBJECT_NAMECHANGE`
-- Virtual desktop: `EVENT_SYSTEM_DESKTOPSWITCH` + 1s clock timer
-- Volume scroll: `PointerWheelChanged` on RootGrid; cumulative delta threshold (120 units) → `keybd_event`
-- Clock / virtual desktop / fullscreen check: `DispatcherTimer` every 1s
-- Battery: `Battery.AggregateBattery.ReportUpdated` + `DispatcherTimer` every 10s. `OnBatteryReportUpdated` is throttled to 1s.
-- Media: `MediaService` event subscriptions (event-driven, minimal polling). Bar shows now-playing text only; use Windows Quick Settings / Action Center (`Win+A`) for the system media panel.
-- Phone Reconnect: `PhoneSpinner` (ProgressRing) must have `IsActive="False"` when `Visibility="Collapsed"` to prevent 0.5ms system timer interrupts.
+**Event sources:** foreground/title WinEvent hooks; desktop switch WinEvent hook; 1s clock timer (also fullscreen check); battery event + 10s timer; media SMTC events; volume scroll wheel handler.
 
 ## Key Patterns & Gotchas
 
-**Battery / performance optimization:**
-- WinUI 3 `ProgressRing` keeps the render loop alive at 0.5ms resolution if `IsActive="True"`, even if collapsed. Toggle it off when hidden.
-- SMTC events can fire hundreds of times a minute; use the `_appNameCache` in `MediaService` to avoid redundant process scanning.
+**Performance:** `ProgressRing` must have `IsActive="False"` when hidden; SMTC can be chatty—keep `MediaService` caching.
 
 **Flyout constraints:**
 - `ShouldConstrainToRootBounds="False"` is required for `FlyoutBase.SystemBackdrop` to work
 - No `AcrylicBrush.BackgroundSource` in WinUI 3 — use `FlyoutBase.SystemBackdrop = DesktopAcrylicBackdrop` and `AcrylicBrush` as tint only
 
-**Hit-test expansion:** Widgets use outer `Grid` (`Margin="0,-3,0,0"`) for hit area + inner `Border` (`Margin="0,3,0,0"`) for visual positioning. Do not use negative right margins on StackPanel items.
+**Hit-test expansion:** outer `Grid` uses `Margin="0,-3,0,0"`; inner `Border` uses `Margin="0,3,0,0"`. Avoid negative right margins on StackPanel items.
 
 **Fullscreen auto-hide:** `IsWindowFullscreen` compares `GetWindowRect` to `GetMonitorInfo.rcMonitor` on the same monitor as the bar. Fullscreen is distinguished from maximized by absence of `WS_CAPTION`. Shell windows and cloaked windows are excluded. State tracked in `_isFullscreenActive`.
+
+**Borderless window / hit-testing (critical):**
+- Presenter APIs alone can be insufficient.
+- Non-client frame + edge hit-testing are controlled by Win32 `GWL_STYLE`: clear `WS_CAPTION` / `WS_THICKFRAME` (and related frame styles) and apply `SWP_FRAMECHANGED`.
 
 **Battery / energy saver:** Do NOT use `Windows.System.Power.PowerManager.EnergySaverStatus` — throws in unpackaged apps. Use `ChargeRateInMilliwatts > 0` for charging; do not use `BatteryFlag & 8` alone (Lenovo misreports it).
 
@@ -73,15 +56,15 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 
 ## Key Constraints
 
-- .NET 8, Windows App SDK 1.5, minimum Windows 10 1809
+- .NET 8, Windows App SDK 1.8, minimum Windows 10 1809
 - Unpackaged (`WindowsPackageType=None`): no MSIX, no package identity
 - Segoe Fluent Icons glyphs only (no image assets); `FontFamily="Segoe UI Variable"` on `TextBlock` only — never on `Grid`/`Panel`
 - Root `Grid` has `RequestedTheme="Dark"` for consistent dark flyouts
 - `{StaticResource SystemAccentColorDark2}` is static — runtime accent updates only affect bar background
 - Publish requires `-p:Platform=x64`
 
-## Development Process
+## Dev loop
 
-1. **Plan:** Break into explicit phases before writing any code.
-2. **Build after each phase:** `dotnet build MenuBar.csproj`. Fix all errors before proceeding.
-3. **Finalize:** Always publish to the `publish/` folder after every completed change — use the `dotnet publish` command from Build & Run above.
+- Make a focused change.
+- `dotnet build MenuBar.csproj`
+- Republish to `publish/` using the command above.

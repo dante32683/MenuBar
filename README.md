@@ -37,7 +37,7 @@ To build it yourself:
 dotnet publish MenuBar.csproj -c Release -r win-x64 -p:Platform=x64 -o publish --no-self-contained
 ```
 
-Requires .NET 8 and Windows App SDK 1.5. Windows 10 1809 or newer.
+Requires .NET 8 and Windows App SDK 1.8. Windows 10 1809 or newer.
 
 ## Context Menu
 

@@ -73,6 +73,7 @@ namespace MenuBar
         };
 
         private IntPtr _hwnd;
+        private bool _presenterConfigured;
         private DispatcherTimer _clockTimer;
         private DispatcherTimer _batteryTimer;
         private IntPtr _foregroundHook;
@@ -118,6 +119,7 @@ namespace MenuBar
             _hwnd = WindowNative.GetWindowHandle(this);
             _mediaService = new MediaService(DispatcherQueue);
             Closed += Window_Closed;
+            Activated += MainWindow_Activated;
 
             ViewModel.EyeBreakDotBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 0x6C, 0xCB, 0x5F));
             // Keep spacing balanced: the window icon already has Margin="8,0,0,0".
@@ -324,6 +326,13 @@ namespace MenuBar
             return false;
         }
 
+        private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
+        {
+            // AppWindow.Presenter may not be fully initialized in the constructor on newer WinAppSDK builds.
+            // Re-apply borderless presenter settings once activation has occurred.
+            TryConfigurePresenter();
+        }
+
         private IntPtr NewWindowProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, uint uIdSubclass, IntPtr dwRefData)
         {
             // Exceptions must not escape a native callback — they cross the managed/native
@@ -369,15 +378,21 @@ namespace MenuBar
                 SystemBackdrop = new DesktopAcrylicBackdrop();
             }
 
-            AppWindow appWindow = AppWindow.GetFromWindowId(
-                Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd));
-            if (appWindow.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.IsMaximizable = false;
-                presenter.IsMinimizable = false;
-                presenter.IsResizable = false;
-                presenter.SetBorderAndTitleBar(false, false);
-            }
+            TryConfigurePresenter();
+
+            // Conclusive border removal: Win32 non-client frame is controlled by GWL_STYLE.
+            // If WS_CAPTION/WS_THICKFRAME are present, DWM will draw a frame and hit-testing
+            // will reserve non-client borders (breaking "Fitts law" edge clicking).
+            // WinAppSDK presenter settings alone are not guaranteed to clear these styles.
+            int style = NativeMethods.GetWindowLong(_hwnd, NativeMethods.GWL_STYLE);
+            style &= ~(
+                NativeMethods.WS_CAPTION |
+                NativeMethods.WS_THICKFRAME |
+                NativeMethods.WS_SYSMENU |
+                NativeMethods.WS_MINIMIZEBOX |
+                NativeMethods.WS_MAXIMIZEBOX |
+                NativeMethods.WS_BORDER);
+            NativeMethods.SetWindowLong(_hwnd, NativeMethods.GWL_STYLE, style);
 
             int exStyle = NativeMethods.GetWindowLong(_hwnd, NativeMethods.GWL_EXSTYLE);
             // Keep the bar out of Alt-Tab while still behaving like a normal top-docked AppBar.
@@ -395,6 +410,30 @@ namespace MenuBar
                 NativeMethods.SWP_NOACTIVATE);
 
             RegisterOrUpdateAppBar(registerIfNeeded: true);
+        }
+
+        private void TryConfigurePresenter()
+        {
+            if (_presenterConfigured || _hwnd == IntPtr.Zero) return;
+
+            try
+            {
+                AppWindow appWindow = AppWindow.GetFromWindowId(
+                    Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd));
+                if (appWindow?.Presenter is OverlappedPresenter presenter)
+                {
+                    presenter.IsMaximizable = false;
+                    presenter.IsMinimizable = false;
+                    presenter.IsResizable = false;
+                    presenter.SetBorderAndTitleBar(false, false);
+
+                    _presenterConfigured = true;
+                }
+            }
+            catch
+            {
+                // Best-effort: if this fails pre-activation, Activated will retry.
+            }
         }
 
         private void RegisterOrUpdateAppBar(bool registerIfNeeded)

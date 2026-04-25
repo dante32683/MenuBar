@@ -432,9 +432,19 @@ namespace MenuBar.ViewModels
                     OnPropertyChanged(nameof(FlyoutTitleFontSize));
                     OnPropertyChanged(nameof(FlyoutBodyFontSize));
                     OnPropertyChanged(nameof(FlyoutCaptionFontSize));
+                    OnPropertyChanged(nameof(ClockTextMargin));
+                    OnPropertyChanged(nameof(ActiveWindowTitleMargin));
                 }
             }
         }
+
+        // Segoe UI Variable tends to render slightly low at small sizes in this bar layout,
+        // especially for digit-heavy strings (clock/date). Shift up without changing measured height.
+        public Thickness ClockTextMargin =>
+            new Thickness(0, -Math.Round(_textFontSize * 0.08), 0, 0);
+
+        public Thickness ActiveWindowTitleMargin =>
+            new Thickness(4, -Math.Round(_textFontSize * 0.08), 0, 0);
 
         // Responsive Flyout Font Sizes
         // Derived from TextFontSize (base 11px -> 14px body, 20px title, 12px caption)

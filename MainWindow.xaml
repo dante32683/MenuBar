@@ -268,7 +268,7 @@
                                MaxWidth="340"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
-                               Margin="4,0,0,0">
+                               Margin="{x:Bind ViewModel.ActiveWindowTitleMargin, Mode=OneWay}">
                         <ToolTipService.ToolTip>
                             <ToolTip Style="{StaticResource BarToolTipStyle}">
                                 <ToolTip.Content>
@@ -642,6 +642,7 @@
                                        FontFamily="Segoe UI Variable, Segoe UI"
                                        FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                       Margin="{x:Bind ViewModel.ClockTextMargin, Mode=OneWay}"
                                        VerticalAlignment="Center" />
                         </Border>
                         <ToolTipService.ToolTip>

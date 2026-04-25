@@ -22,12 +22,11 @@
     "volume_scroll_threshold": "Cumulative scroll delta required to change volume (120 = one standard mouse wheel click).",
     "show_projected_runtime": "Show battery runtime prediction in the battery flyout when enough charge-rate data is available.",
     "battery_show_progress_bar": "Show a charge level progress bar in the battery flyout.",
-    "battery_show_usage_time": "Show 'usage since full charge' time in the battery flyout (requires discharge history to build up)."
-    ,
+    "battery_show_usage_time": "Show 'usage since full charge' time in the battery flyout (requires discharge history to build up).",
     "show_eye_break": "Show the 20-20-20 eye break dot indicator (driven by AHK via IPC)."
   },
 
-  "bar_height": 28,
+  "bar_height": 24,
   "show_battery": true,
   "show_network": true,
   "show_clock": true,
@@ -44,11 +43,11 @@
   "font_size_text": 0,
   "font_size_icon": 0,
   "show_app_menu": false,
-  "show_virtual_desktop": false,
+  "show_virtual_desktop": true,
   "enable_volume_scroll": true,
   "volume_scroll_threshold": 120,
   "show_projected_runtime": true,
-  "battery_show_progress_bar": true,
+  "battery_show_progress_bar": false,
   "battery_show_usage_time": true,
   "show_eye_break": true
 }
