@@ -14,39 +14,17 @@
         <Grid.Resources>
             <Style x:Key="BarToolTipStyle" TargetType="ToolTip">
                 <Setter Property="RequestedTheme" Value="Dark" />
-                <Setter Property="Background" Value="{ThemeResource SystemFillColorSolidNeutralBackgroundBrush}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorSecondaryBrush}" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="Padding" Value="8,4,8,4" />
+                <!-- Tooltips must never block clicks; PopupHost can otherwise eat input. -->
+                <Setter Property="IsHitTestVisible" Value="False" />
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ToolTip">
-                            <Border x:Name="ToolTipRoot"
-                                    Opacity="0"
-                                    Background="{TemplateBinding Background}"
+                            <Border Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="4"
                                     Padding="{TemplateBinding Padding}">
-                                <Border.Shadow>
-                                    <ThemeShadow />
-                                </Border.Shadow>
                                 <ContentPresenter />
-                                <VisualStateManager.VisualStateGroups>
-                                    <VisualStateGroup x:Name="ToolTipStates">
-                                        <VisualState x:Name="Closed" />
-                                        <VisualState x:Name="Opened">
-                                            <Storyboard>
-                                                <!-- Win11-like subtle fade-in -->
-                                                <DoubleAnimation Storyboard.TargetName="ToolTipRoot"
-                                                                 Storyboard.TargetProperty="Opacity"
-                                                                 To="1"
-                                                                 Duration="0:0:0.12"
-                                                                 BeginTime="0:0:0.08" />
-                                            </Storyboard>
-                                        </VisualState>
-                                    </VisualStateGroup>
-                                </VisualStateManager.VisualStateGroups>
                             </Border>
                         </ControlTemplate>
                     </Setter.Value>
@@ -350,7 +328,8 @@
                           PointerEntered="Host_PointerEntered"
                           PointerExited="Host_PointerExited"
                           PointerPressed="Host_PointerPressed"
-                          PointerReleased="Host_PointerReleased">
+                          PointerReleased="Host_PointerReleased"
+                          Tapped="MediaHost_Tapped">
                         <Border x:Name="MediaHost"
                                 Background="Transparent"
                                 CornerRadius="{x:Bind ViewModel.HostCornerRadius, Mode=OneWay}"

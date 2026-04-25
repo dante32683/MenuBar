@@ -71,7 +71,7 @@ Edit `settings.json` next to the exe. Right-click the bar > **Reload Settings** 
 | `clock_24h` | `false` | Use 24-hour time format |
 | `clock_show_seconds` | `false` | Show seconds in the clock |
 | `clock_show_date` | `true` | Show the date alongside the time |
-| `clock_date_format` | `"MM/dd/yyyy"` | .NET date format string for the date portion |
+| `clock_date_format` | `"M/d/yyyy"` | .NET date format string for the date portion |
 | `use_accent_color` | `true` | Tint the bar background with your Windows accent color |
 | `title_max_length` | `0` | Truncate window title after N characters (0 = no limit) |
 | `media_max_length` | `0` | Truncate media title after N characters (0 = no limit) |

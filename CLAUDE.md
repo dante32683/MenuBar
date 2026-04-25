@@ -57,7 +57,7 @@ Single-window app. `MainWindow.xaml.cs` coordinates all services. AppBar registe
 
 **Virtual desktop:** `EVENT_SYSTEM_DESKTOPSWITCH` fires before the registry is updated. `OnDesktopSwitchEvent` defers `UpdateVirtualDesktop()` by 50ms. Do not call it synchronously in the event.
 
-**Clock / Notification Center:** `ClockHost_Tapped` sends `Win+N`. Skip if `_lastExternalForegroundHwnd` process is `ShellExperienceHost`.
+**Clock / Notification Center:** `ClockHost_Tapped` sends `Win+N`. Skip if `_lastExternalForegroundHwnd` process is `ShellExperienceHost`. **Quick settings / media:** `TrySendWinAForQuickSettings` sends `Win+A`; same toggle pattern — skip if `_lastExternalForegroundHwnd` is `ShellExperienceHost` (bar is already foreground by Tapped time, so check the last external hwnd directly).
 
 **Threading:** `UiaMenuService` and `VirtualDesktopService` COM calls run on background MTA threads. All UI updates must be dispatched via `DispatcherQueue`.
 

@@ -47,7 +47,7 @@ namespace MenuBar.Services
         public bool ClockShowDate { get; set; } = true;
 
         [JsonPropertyName("clock_date_format")]
-        public string ClockDateFormat { get; set; } = "MM/dd/yyyy";
+        public string ClockDateFormat { get; set; } = "M/d/yyyy";
 
         [JsonPropertyName("show_projected_runtime")]
         public bool ShowProjectedRuntime { get; set; } = true;
@@ -93,7 +93,7 @@ namespace MenuBar.Services
         {
             BarHeight = GetEffectiveBarHeight();
             if (string.IsNullOrWhiteSpace(ClockDateFormat))
-                ClockDateFormat = "MM/dd/yyyy";
+                ClockDateFormat = "M/d/yyyy";
             if (VolumeScrollThreshold <= 0)
                 VolumeScrollThreshold = 120;
         }

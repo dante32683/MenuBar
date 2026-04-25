@@ -82,6 +82,7 @@ namespace MenuBar
         private bool _appBarRegistered;
         private IntPtr _lastForegroundHwnd = IntPtr.Zero;
         private IntPtr _lastExternalForegroundHwnd;
+        private long _quickSettingsSentAt;
         private MenuBarSettings _settings = MenuBarSettings.CreateDefault();
         private readonly Windows.UI.ViewManagement.UISettings _uiSettings = new();
         private HardwareService.BatteryInfo _batteryInfo = new HardwareService.BatteryInfo();
@@ -359,13 +360,13 @@ namespace MenuBar
 
         private void ConfigureWindow()
         {
-            if (DesktopAcrylicController.IsSupported())
-            {
-                SystemBackdrop = new DesktopAcrylicBackdrop();
-            }
-            else if (MicaController.IsSupported())
+            if (MicaController.IsSupported())
             {
                 SystemBackdrop = new MicaBackdrop { Kind = MicaKind.Base };
+            }
+            else if (DesktopAcrylicController.IsSupported())
+            {
+                SystemBackdrop = new DesktopAcrylicBackdrop();
             }
 
             AppWindow appWindow = AppWindow.GetFromWindowId(
@@ -802,7 +803,7 @@ namespace MenuBar
                 }
                 catch
                 {
-                    clockText = now.ToString("MM/dd/yyyy  " + timeFmt);
+                    clockText = now.ToString("M/d/yyyy  " + timeFmt);
                 }
             }
             else
@@ -1499,12 +1500,27 @@ namespace MenuBar
 
         private void QuickSettingsHost_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            // PointerPressed is too late here; WinUI has already triggered the window activation/focus change.
-            if (IsShellExperienceHostWindow(_lastExternalForegroundHwnd))
+            TrySendWinAForQuickSettings();
+        }
+
+        private void MediaHost_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            TrySendWinAForQuickSettings();
+        }
+
+        private void TrySendWinAForQuickSettings()
+        {
+            // On Win11 24H2 the Quick Settings host is not ShellExperienceHost, so we can't use the
+            // process-name check that works for Notification Center. Instead track when we last sent
+            // Win+A: if the bar gains focus within 1500ms it means the panel was open and dismissed
+            // itself, so don't resend.
+            long now = Environment.TickCount64;
+            if (_quickSettingsSentAt != 0 && now - _quickSettingsSentAt < 1500)
             {
-                _lastExternalForegroundHwnd = IntPtr.Zero;
+                _quickSettingsSentAt = 0;
                 return;
             }
+            _quickSettingsSentAt = now;
             SendKeyChord(NativeMethods.VK_LWIN, NativeMethods.VK_A);
         }
 
