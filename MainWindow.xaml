@@ -656,40 +656,40 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- Virtual desktop pill — centered over the full bar width -->
-                <Border x:Name="VirtualDesktopHost"
-                        Grid.Column="0"
-                        Grid.ColumnSpan="4"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Visibility="{x:Bind ViewModel.VirtualDesktopVisibility, Mode=OneWay}"
-                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        Padding="10,3"
-                        PointerEntered="VirtualDesktopHost_PointerEntered"
-                        PointerExited="VirtualDesktopHost_PointerExited"
-                        PointerPressed="VirtualDesktopHost_PointerPressed"
-                        PointerReleased="VirtualDesktopHost_PointerReleased"
-                        Tapped="VirtualDesktopHost_Tapped">
-                    <TextBlock Text="{x:Bind ViewModel.VirtualDesktopText, Mode=OneWay}"
-                               FontFamily="Segoe UI Variable, Segoe UI"
-                               FontWeight="SemiBold"
-                               FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
-                               Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                               VerticalAlignment="Center" />
-                    <ToolTipService.ToolTip>
-                        <ToolTip Style="{StaticResource BarToolTipStyle}">
-                            <ToolTip.Content>
-                                <TextBlock Text="{x:Bind ViewModel.VirtualDesktopTooltip, Mode=OneWay}"
-                                           Style="{StaticResource BarToolTipTextStyle}" />
-                            </ToolTip.Content>
-                        </ToolTip>
-                    </ToolTipService.ToolTip>
-                </Border>
             </Grid>
         </Border>
+
+        <!-- Virtual desktop pill — centered relative to the full window, not the content grid. -->
+        <Border x:Name="VirtualDesktopHost"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="{x:Bind ViewModel.VirtualDesktopVisibility, Mode=OneWay}"
+                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="10,3"
+                PointerEntered="VirtualDesktopHost_PointerEntered"
+                PointerExited="VirtualDesktopHost_PointerExited"
+                PointerPressed="VirtualDesktopHost_PointerPressed"
+                PointerReleased="VirtualDesktopHost_PointerReleased"
+                Tapped="VirtualDesktopHost_Tapped">
+            <TextBlock Text="{x:Bind ViewModel.VirtualDesktopText, Mode=OneWay}"
+                       FontFamily="Segoe UI Variable, Segoe UI"
+                       FontWeight="SemiBold"
+                       FontSize="{x:Bind ViewModel.TextFontSize, Mode=OneWay}"
+                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                       VerticalAlignment="Center" />
+            <ToolTipService.ToolTip>
+                <ToolTip Style="{StaticResource BarToolTipStyle}">
+                    <ToolTip.Content>
+                        <TextBlock Text="{x:Bind ViewModel.VirtualDesktopTooltip, Mode=OneWay}"
+                                   Style="{StaticResource BarToolTipTextStyle}" />
+                    </ToolTip.Content>
+                </ToolTip>
+            </ToolTipService.ToolTip>
+        </Border>
+
         <!-- Right-edge hit extension for ClockHost. Lives in RootGrid so it doesn't affect column layout. -->
         <Border Visibility="{x:Bind ViewModel.ClockVisibility, Mode=OneWay}"
                 HorizontalAlignment="Right"
