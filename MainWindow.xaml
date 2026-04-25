@@ -669,6 +669,7 @@
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="10,3"
+                Margin="0,3,0,3"
                 PointerEntered="VirtualDesktopHost_PointerEntered"
                 PointerExited="VirtualDesktopHost_PointerExited"
                 PointerPressed="VirtualDesktopHost_PointerPressed"
